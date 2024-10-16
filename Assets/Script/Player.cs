@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Text;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public enum InputCondition
 {
@@ -10,15 +11,21 @@ public enum InputCondition
 
 public class Player : MonoBehaviour
 {
+    [Header("Anti-roll Bar Settings")]
+    [SerializeField] public bool antiRollEnabled = true;
+    [SerializeField] private float antiRollForce = 5000f;
+
+    [Header("Wheel Colliders")]
     [SerializeField] WheelCollider frontRight;
     [SerializeField] WheelCollider frontLeft;
     [SerializeField] WheelCollider rearRight;
     [SerializeField] WheelCollider rearLeft;
 
+    [Header("Wheel Transforms")]
     [SerializeField] Transform frontRightTransform;
     [SerializeField] Transform frontLeftTransform;
     [SerializeField] Transform rearRightTransform;
-    [SerializeField] Transform rearLeftTransform;    
+    [SerializeField] Transform rearLeftTransform;
 
     private float currentTurnAngle = 0f;
     private float maxTurnAngle = 15f;
@@ -44,6 +51,13 @@ public class Player : MonoBehaviour
     private float changeDelay = 1.0f;
     public EffectControlInfo effectinfo;
 
+    private Rigidbody rb;
+
+    private void Awake()
+    {
+        rb = GetComponent<Rigidbody>();
+
+    }
 
     void Start()
     {
@@ -63,6 +77,16 @@ public class Player : MonoBehaviour
             Brake();
             WheelControl();
             LightControl();
+
+            float speed = CalculateCurrentSpeed();
+            Debug.Log("Current Speed: " + speed + " km/s");
+
+            if (antiRollEnabled)
+            {
+                ApplyAntiRoll();
+            }
+
+            Re();
         }
         else if (!LogitechGSDK.LogiIsConnected(0))
         {
@@ -84,9 +108,10 @@ public class Player : MonoBehaviour
                 if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
                 {
                     rec = LogitechGSDK.LogiGetStateUnity(0);
-                    accelerator = Mathf.Abs(rec.lY - 32767) / 400;
-                    //Debug.Log(accelerator);
+                    accelerator = Mathf.Abs(rec.lY - 32767) / 1;
                     currentAccelerator = accelerator;
+                    Debug.Log("Logitech Accel Force: " + currentAccelerator / 10000);
+
                 }
                 break;
             case InputCondition.keyboard:
@@ -107,20 +132,19 @@ public class Player : MonoBehaviour
     private void Brake()
     {
         t = Time.deltaTime;
+        bool absActivated = false;
         switch (inputcondition)
         {
             case InputCondition.logitech_wheel:
                 if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
                 {
                     rec = LogitechGSDK.LogiGetStateUnity(0);
-                    brakeForce = Mathf.Abs(rec.lRz - 32767) / 400;
-                    //Debug.Log("현재속도: " + initialVelocity.z + ", 가속도: " + brakeForce);
-                    if (brakeForce <= 0)
-                        brakeForce = 0;
+                    brakeForce = Mathf.Abs(rec.lRz - 32767) * 100;
+                    //Debug.Log("Logitech Brake Force: " + brakeForce / 100);
+
                     currentBrakeForce = brakeForce;
+                    //Debug.Log("현재속도: " + initialVelocity.z + ", 가속도: " + brakeForce);
                 }
-                else
-                    brakeForce = 0f;
                 break;
             case InputCondition.keyboard:
                 if (Input.GetKey(KeyCode.Space))
@@ -154,7 +178,7 @@ public class Player : MonoBehaviour
 
         frontRight.brakeTorque = currentBrakeForce;
         frontLeft.brakeTorque = currentBrakeForce;
-        rearRight.motorTorque = currentBrakeForce;
+        rearRight.brakeTorque = currentBrakeForce;
         rearLeft.brakeTorque = currentBrakeForce;
 
         currentTurnAngle = maxTurnAngle * rec.lX / 32767;
@@ -179,7 +203,41 @@ public class Player : MonoBehaviour
         trans.position = UpdatePos;
         trans.rotation = UpdateRot;
     }
+    private void ApplyAntiRoll()
+    {
+        ApplyAntiRollForAxle(frontLeft, frontRight);
+        ApplyAntiRollForAxle(rearLeft, rearRight);
+    }
+    private void ApplyAntiRollForAxle(WheelCollider leftWheel, WheelCollider rightWheel)
+    {
+        WheelHit hit;
+        float travelL = 1.0f;
+        float travelR = 1.0f;
 
+        bool groundedL = leftWheel.GetGroundHit(out hit);
+        if (groundedL)
+        {
+            travelL = (-leftWheel.transform.InverseTransformPoint(hit.point).y - leftWheel.radius) / leftWheel.suspensionDistance;
+        }
+
+        bool groundedR = rightWheel.GetGroundHit(out hit);
+        if (groundedR)
+        {
+            travelR = (-rightWheel.transform.InverseTransformPoint(hit.point).y - rightWheel.radius) / rightWheel.suspensionDistance;
+        }
+
+        float antiRollForce = (travelL - travelR) * this.antiRollForce;
+
+        if (groundedL)
+        {
+            rb.AddForceAtPosition(leftWheel.transform.up * -antiRollForce, leftWheel.transform.position);
+        }
+
+        if (groundedR)
+        {
+            rb.AddForceAtPosition(rightWheel.transform.up * antiRollForce, rightWheel.transform.position);
+        }
+    }
     void LightControl()
     {
         float t = Time.time;
@@ -264,6 +322,26 @@ public class Player : MonoBehaviour
             }
         }
     }
+
+    private void Re()
+    {
+        if (Input.GetKey(KeyCode.R))
+        {
+            this.transform.position = new Vector3(0, 3, -220);
+            this.transform.rotation = Quaternion.identity;
+        }
+
+
+    }
+
+    float CalculateCurrentSpeed()
+    {
+        // 간단히 현재 속도를 계산하여 확인
+        float radius = frontRight.radius;
+        float rpm = frontRight.rpm;
+        return (rpm * 2 * Mathf.PI * radius) / 20000;
+    }
+
     //이펙트 제어 정보
     [System.Serializable]
     public struct EffectControlInfo
