@@ -2,6 +2,7 @@ using System.Collections;
 using System.Text;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 public enum InputCondition
 {
@@ -27,12 +28,19 @@ public class Player : MonoBehaviour
     [SerializeField] Transform rearRightTransform;
     [SerializeField] Transform rearLeftTransform;
 
-    private float currentTurnAngle = 0f;                                                            //현재 바퀴 각도
-    private float currentAccelerator = 0f;                                                          //현재 엑셀을 어느 정도 밟았는지
-    private float currentBrakeForce = 0f;                                                           //현재 브레이크를 어느 정도 밟았는지
-    private float maxTurnAngle = 15f;
+    [Header("Text UI")]
+    [SerializeField] Text speedText;                                                        //속도 표시
+    [SerializeField] Text rightSign;
+    [SerializeField] Text leftSign;
+
+    //속도관련 변수
     private float accelerator;                                                                      //엑셀에 가하는 힘
     private float brakeForce;                                                                       //브레이크에 가하는 힘
+    private float currentAccelerator = 0f;                                                          //현재 엑셀을 어느 정도 밟았는지
+    private float currentBrakeForce = 0f;                                                           //현재 브레이크를 어느 정도 밟았는지
+    private float currentTurnAngle = 0f;                                                            //현재 바퀴 각도
+    private float maxTurnAngle = 6f;
+    public int handleResistance = 30;                                                              //핸들 저항 변수
 
     public InputCondition inputcondition;                                                           //현재 Input이 wheel/keyboard 체크
 
@@ -71,15 +79,14 @@ public class Player : MonoBehaviour
     // Update is called once per frame
     void FixedUpdate()
     {
-        if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))                            //wheel 업테이트 && 컨트롤러 중 0번째가 연결되어 있는지 체크
+        if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))                           //wheel 업테이트 && 컨트롤러 중 0번째가 연결되어 있는지 체크
         {
             Accel();                                                                                //엑셀 제어 함수
             Brake();                                                                                //브레이크 제어 함수
             WheelControl();                                                                         //핸들 제어 함수
             LightControl();                                                                         //방향지시등과 같은 라이트 제어 함수
 
-            float speed = CalculateCurrentSpeed();                                                  
-            Debug.Log("Current Speed: " + speed + " km/s");
+            DisplaySpeed(CalculateCurrentSpeed());
 
             if (antiRollEnabled)                                                                    //Anti-roll on/off 체크
             {
@@ -180,6 +187,8 @@ public class Player : MonoBehaviour
         rearRight.brakeTorque = currentBrakeForce;
         rearLeft.brakeTorque = currentBrakeForce;
 
+
+        LogitechGSDK.LogiPlayDamperForce(0, handleResistance);                                         //핸들에 handleResistance만큼 저항 부여
         currentTurnAngle = maxTurnAngle * rec.lX / 32767;                                              //앞바퀴에 핸들을 돌린 만큼의 힘을 전달하여 바퀴를 최대 각도까지 돌려줌
         frontLeft.steerAngle = currentTurnAngle;
         frontRight.steerAngle = currentTurnAngle;
@@ -238,7 +247,7 @@ public class Player : MonoBehaviour
     }
     void LightControl()
     {
-        float t = Time.time;
+        t = Time.time;
         if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
         {
             rec = LogitechGSDK.LogiGetStateUnity(0);
@@ -247,9 +256,11 @@ public class Player : MonoBehaviour
             if (LogitechGSDK.LogiButtonIsPressed(0, 4) && t - lastIndicatorChangeTime >= changeDelay)
             {
                 isRightIndicatorOn = !isRightIndicatorOn;                                                   // 상태 반전
+                rightSign.enabled = isRightIndicatorOn;
                 if (isRightIndicatorOn)
                 {
                     isLeftIndicatorOn = false;                                                              // 왼쪽 방향 끄기
+                    leftSign.enabled = false;
                     ToggleLights(effectinfo.leftLight, false);
                 }
                 ToggleLights(effectinfo.rightLight, isRightIndicatorOn);
@@ -260,9 +271,11 @@ public class Player : MonoBehaviour
             if (LogitechGSDK.LogiButtonIsPressed(0, 5) && t - lastIndicatorChangeTime >= changeDelay)
             {
                 isLeftIndicatorOn = !isLeftIndicatorOn;                                                     // 상태 반전
+                leftSign.enabled = isLeftIndicatorOn;
                 if (isLeftIndicatorOn)
                 {
                     isRightIndicatorOn = false;                                                             // 오른쪽 방향 끄기
+                    rightSign.enabled = false;
                     ToggleLights(effectinfo.rightLight, false);
                 }
                 ToggleLights(effectinfo.leftLight, isLeftIndicatorOn);
@@ -297,6 +310,8 @@ public class Player : MonoBehaviour
             }
         }
 
+        SignBlinking(leftSign, isLeftIndicatorOn, t);
+        SignBlinking(rightSign, isRightIndicatorOn, t);
         HandleBlinking(effectinfo.leftLight, isLeftIndicatorOn, t);
         HandleBlinking(effectinfo.rightLight, isRightIndicatorOn, t);
     }
@@ -305,7 +320,7 @@ public class Player : MonoBehaviour
     {
         foreach (Light light in lights)
         {
-            light.enabled = state ?? !light.enabled; // 상태에 따라 라이트 켜거나 끄기
+            light.enabled = state ?? !light.enabled;                                                        // 상태에 따라 라이트 켜거나 끄기
         }
     }
 
@@ -316,8 +331,17 @@ public class Player : MonoBehaviour
             lastBlinkTime = t;
             foreach (Light light in lights)
             {
-                light.enabled = !light.enabled; // 라이트 상태 깜빡임
+                light.enabled = !light.enabled;                                                             // 라이트 상태 깜빡임
             }
+        }
+    }
+
+    void SignBlinking(Text sign, bool isIndicatorOn, float t)
+    {
+        if (isIndicatorOn && t - lastBlinkTime >= blinkInterval)
+        {
+            lastBlinkTime = t;
+            sign.enabled = !sign.enabled;                                                                   // 방향지시등 상태 깜빡임
         }
     }
 
@@ -338,6 +362,11 @@ public class Player : MonoBehaviour
         float radius = frontRight.radius;
         float rpm = frontRight.rpm;
         return (rpm * 2 * Mathf.PI * radius) / 20000;
+    }
+    private void DisplaySpeed(float speed)
+    {
+        // 소수점제외한 후 속도 표시
+        speedText.text = $"{(int)speed} km/h";
     }
 
     //이펙트 제어 정보
