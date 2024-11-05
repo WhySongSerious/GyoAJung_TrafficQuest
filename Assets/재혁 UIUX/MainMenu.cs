@@ -13,31 +13,32 @@ public class MainMenu : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        
+
     }
 
     public void OnClickNewGame()
     {
-        Debug.Log("새 게임")
+        Debug.Log("새 게임");
     }
 
     public void OnClickLoad()
     {
-        Debug.Log("불러오기")
+        Debug.Log("불러오기");
     }
 
     public void OnClickOption()
     {
-        Debug.Log("옵션")
+        Debug.Log("옵션");
     }
 
-    public void OnclickQuit()
+    public void OnCLickQuit()
     {
-#if UNITY_EDITOR
-    UnityEditor.EditorApplication.isPlaying= false;
-#else 
-    Application.Quit();
-#endif 
+       #if UNITY_EDITOR 
+       UnityEditor.EditorApplication.isPlaying = false;
 
+       #else 
+       Application.Quit();
+       
+       #endif
     }
 }
