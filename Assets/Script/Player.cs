@@ -1,10 +1,7 @@
 using System.Collections;
 using System.Text;
-using UnityEditor.SearchService;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.UI;
-using UnityEngine.SceneManagement;
 
 public enum InputCondition
 {
@@ -14,93 +11,82 @@ public enum InputCondition
 
 public class Player : MonoBehaviour
 {
-    [SerializeField] GameObject SpeedCalaulator;
+    [Header("Anti-roll Bar Settings")]
+    [SerializeField] public bool antiRollEnabled = true;
+    [SerializeField] private float antiRollForce = 5000f;
 
-    [Header("Anti-roll Bar Settings")]                                                              //Anti-roll 제어
-    [SerializeField] public bool antiRollEnabled = true;                                            //Anti-roll on/off
-    [SerializeField] private float antiRollForce = 5000f;                                           //A
-
-    [Header("Wheel Colliders")]                                                                     //바퀴 제어
-    [SerializeField] WheelCollider frontRight;                      
+    [Header("Wheel Colliders")]
+    [SerializeField] WheelCollider frontRight;
     [SerializeField] WheelCollider frontLeft;
     [SerializeField] WheelCollider rearRight;
     [SerializeField] WheelCollider rearLeft;
 
-    [Header("Wheel Transforms")]                                                                    //바퀴 비주얼 업데이트
+    [Header("Wheel Transforms")]
     [SerializeField] Transform frontRightTransform;
     [SerializeField] Transform frontLeftTransform;
     [SerializeField] Transform rearRightTransform;
     [SerializeField] Transform rearLeftTransform;
 
-    [Header("Text UI")]
-    [SerializeField] Text rightSign;
-    [SerializeField] Text leftSign;
-    [SerializeField] Text GearSign;
+    private float currentTurnAngle = 0f;
+    private float maxTurnAngle = 15f;
+    private float accelerator;
+    private float brakeForce;
+    private float currentAccelerator = 0f;
+    private float currentBrakeForce = 0f;
 
-    //속도관련 변수
-    private float accelerator;                                                                      //엑셀에 가하는 힘
-    private float reverseForce;
-    private float brakeForce;                                                                       //브레이크에 가하는 힘
-    private float currentAccelerator = 0f;                                                          //현재 엑셀을 어느 정도 밟았는지
-    private float currentReverseForce = 0f;
-    private float currentBrakeForce = 0f;                                                           //현재 브레이크를 어느 정도 밟았는지
-    private float currentTurnAngle = 0f;                                                            //현재 바퀴 각도
-    private float maxTurnAngle = 6f;
-    public int handleResistance = 30;                                                              //핸들 저항 변수
-    public int gearInput = 1;
-    public float limitSpeed = 50;
+    public InputCondition inputcondition;
 
-    public InputCondition inputcondition;                                                           //현재 Input이 wheel/keyboard 체크
+    private float t;
 
-    private float t;                                                                                //시간 측정 변수
+    private Vector3 initialVelocity = Vector3.zero;
 
-    private Vector3 initialVelocity = Vector3.zero;                                                 //keyboard 제어에서 현재 속도
+    static LogitechGSDK.DIJOYSTATE2ENGINES rec;
 
-    static LogitechGSDK.DIJOYSTATE2ENGINES rec;                                                     //wheel에 담긴 변수를 쓰게 해줌
-
-    public float blinkInterval = 0.5f;                                                              //방향지시등이 켜졌을 때 깜박임 간격 (초)
-    private bool isLeftIndicatorOn = false;                                                         //좌측 방향지시등이 켜져있는지 체크
-    private bool isRightIndicatorOn = false;                                                        //우측 방향지시등이 켜져있는지 체크
-    //private bool isFrontIndicatorOn = false;                                                      //전조등이 켜져있는지 체크
-    private float lastBlinkTime;                                                                    //방향지시등이 깜빡일 때 언제를 기준으로 켜지고 꺼질지를 판단하는 변수
-    private float lastIndicatorChangeTime = -1f;                                                    //방향지시등을 켜고 끌 때 입력값이 중복되는 경우를 방지하기 위해 딜레이 관련 변수
-    private float changeDelay = 0.5f;                                                               //방향지시등을 켜고 끌 때 입력값이 중복되는 경우를 방지하기 위해 딜레이 관련 변수
-    public EffectControlInfo effectinfo;                                                            //라이트 제어
+    public float blinkInterval = 0.5f; // 깜박임 간격 (초)
+    private bool isLeftIndicatorOn = false;
+    private bool isRightIndicatorOn = false;
+    //private bool isFrontIndicatorOn = false;
+    private float lastBlinkTime;
+    private float lastIndicatorChangeTime = -1f;
+    private float changeDelay = 1.0f;
+    public EffectControlInfo effectinfo;
 
     private Rigidbody rb;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+
     }
 
     void Start()
     {
-        Debug.Log("SteeringInit:" + LogitechGSDK.LogiSteeringInitialize(false));                    //wheel 연결이 되어 있는지 체크
+        Debug.Log("SteeringInit:" + LogitechGSDK.LogiSteeringInitialize(false));
     }
     void OnApplicationQuit()
     {
-        Debug.Log("SteeringShutdown:" + LogitechGSDK.LogiSteeringShutdown());                       //종료할 때 wheel 연결을 끊어 주는지 체크
+        Debug.Log("SteeringShutdown:" + LogitechGSDK.LogiSteeringShutdown());
     }
 
     // Update is called once per frame
     void FixedUpdate()
     {
-        if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))                           //wheel 업테이트 && 컨트롤러 중 0번째가 연결되어 있는지 체크
+        if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
         {
-            ShiftGear();
-            Reverse();
-            Accel();                                                                                //엑셀 제어 함수
-            Brake();                                                                                //브레이크 제어 함수
-            WheelControl();                                                                         //핸들 제어 함수
-            LightControl();                                                                         //방향지시등과 같은 라이트 제어 함수
+            Accel();
+            Brake();
+            WheelControl();
+            LightControl();
 
-            if (antiRollEnabled)                                                                    //Anti-roll on/off 체크
+            float speed = CalculateCurrentSpeed();
+            Debug.Log("Current Speed: " + speed + " km/s");
+
+            if (antiRollEnabled)
             {
-                ApplyAntiRoll();                                                                    //Anti-roll 제어 함수
+                ApplyAntiRoll();
             }
 
-            Re();                                                                                   //지정된 자리로 돌아오고 각도도 초기화
+            Re();
         }
         else if (!LogitechGSDK.LogiIsConnected(0))
         {
@@ -118,11 +104,11 @@ public class Player : MonoBehaviour
         t = Time.deltaTime;
         switch (inputcondition)
         {   
-            case InputCondition.logitech_wheel:                                                     //wheel 제어 시
+            case InputCondition.logitech_wheel:
                 if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
                 {
                     rec = LogitechGSDK.LogiGetStateUnity(0);
-                    accelerator = Mathf.Abs(rec.lY - 32767) / 1;                                    //엑셀을 얼마나 밟았는지 연산 (각도는 -32768 ~ 32767)
+                    accelerator = Mathf.Abs(rec.lY - 32767) / 1;
                     currentAccelerator = accelerator;
                     Debug.Log("Logitech Accel Force: " + currentAccelerator / 10000);
 
@@ -132,8 +118,7 @@ public class Player : MonoBehaviour
                 Debug.Log("keyboard");
                 if (Input.GetKey(KeyCode.UpArrow))
                 {
-                    accelerator = 30000;
-                    currentAccelerator = accelerator;
+                    accelerator = 3;
                     initialVelocity += accelerator * t * Vector3.forward;
                     transform.Translate(initialVelocity * t + Vector3.forward * t * t * accelerator);
                     //Debug.Log("현재속도: " + initialVelocity.z + ", 가속도: " + accelerator);
@@ -143,46 +128,18 @@ public class Player : MonoBehaviour
                 break;
         }
     }
-    private void Reverse()
-    {
 
-        t = Time.deltaTime;
-        switch (inputcondition)
-        {
-            case InputCondition.logitech_wheel:                                                     //wheel 제어 시
-                if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
-                {
-                    rec = LogitechGSDK.LogiGetStateUnity(0);
-                    reverseForce = Mathf.Abs(rec.lY - 32767) / 1;                                    //엑셀을 얼마나 밟았는지 연산 (각도는 -32768 ~ 32767)
-                    currentReverseForce = reverseForce;
-                    Debug.Log("Logitech Accel Force: " + currentReverseForce / 10000);
-
-                }
-                break;
-            case InputCondition.keyboard:
-                Debug.Log("keyboard");
-                if (Input.GetKey(KeyCode.UpArrow))
-                {
-                    reverseForce = 3;
-                    initialVelocity += reverseForce * t * Vector3.forward;
-                    transform.Translate(initialVelocity * t + Vector3.forward * t * t * reverseForce);
-                    //Debug.Log("현재속도: " + initialVelocity.z + ", 가속도: " + reverseForce);
-                }
-                else
-                    transform.Translate(initialVelocity * t + Vector3.forward * t * t * reverseForce);
-                break;
-        }
-    }
     private void Brake()
     {
         t = Time.deltaTime;
+        bool absActivated = false;
         switch (inputcondition)
         {
             case InputCondition.logitech_wheel:
                 if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
                 {
                     rec = LogitechGSDK.LogiGetStateUnity(0);
-                    brakeForce = Mathf.Abs(rec.lRz - 32767) * 100;                                    //브레이크를 얼마나 밟았는지 연산 (각도는 -32768 ~ 32767)
+                    brakeForce = Mathf.Abs(rec.lRz - 32767) * 100;
                     //Debug.Log("Logitech Brake Force: " + brakeForce / 100);
 
                     currentBrakeForce = brakeForce;
@@ -208,7 +165,7 @@ public class Player : MonoBehaviour
                     transform.Translate(initialVelocity * t - Vector3.forward * t * t * brakeForce);
                 }
                 else
-                    brakeForce = 0f;                                                                    //브레이크에서 발을 떼었을 때는 항상 브레이크를 걸어주지 않음
+                    brakeForce = 0f;
                 break;
         }
     }
@@ -216,50 +173,32 @@ public class Player : MonoBehaviour
     //휠 제어 함수
     void WheelControl()
     {
-        switch (gearInput) {
-            case 0:                                                                 //후진
-                frontRight.motorTorque = currentReverseForce;
-                frontLeft.motorTorque = currentReverseForce;
-                break;
-            case 1:                                                                 //주차
-                frontRight.motorTorque = 0;
-                frontLeft.motorTorque = 0;
-                break;
-            case 2:                                                                 //중립
+        frontRight.motorTorque = currentAccelerator;
+        frontLeft.motorTorque = currentAccelerator;
 
-
-                break;
-            case 3:                                                                 //전진
-                frontRight.motorTorque = currentAccelerator;                                                    //앞바퀴에 엑셀을 밟은 만큼의 힘을 전달하여 바퀴를 굴려줌
-                frontLeft.motorTorque = currentAccelerator;
-                break;
-
-        }
-
-        frontRight.brakeTorque = currentBrakeForce;                                                    //모든 바퀴에 브레이크를 밟은 만큼의 힘을 전달하여 바퀴를 멈춰줌
+        frontRight.brakeTorque = currentBrakeForce;
         frontLeft.brakeTorque = currentBrakeForce;
         rearRight.brakeTorque = currentBrakeForce;
         rearLeft.brakeTorque = currentBrakeForce;
 
-
-        LogitechGSDK.LogiPlayDamperForce(0, handleResistance);                                         //핸들에 handleResistance만큼 저항 부여
-        currentTurnAngle = maxTurnAngle * rec.lX / 32767;                                              //앞바퀴에 핸들을 돌린 만큼의 힘을 전달하여 바퀴를 최대 각도까지 돌려줌
+        currentTurnAngle = maxTurnAngle * rec.lX / 32767;
         frontLeft.steerAngle = currentTurnAngle;
         frontRight.steerAngle = currentTurnAngle;
 
-        UpdateWheelVisual(frontRightTransform, frontRight);                                             //모든 바퀴가 굴러가고 바퀴가 돌아가게 비주얼 업데이트
+        UpdateWheelVisual(frontRightTransform, frontRight);
         UpdateWheelVisual(frontLeftTransform, frontLeft);
         UpdateWheelVisual(rearRightTransform, rearRight);
         UpdateWheelVisual(rearLeftTransform, rearLeft);
     }
 
     //휠 운동 시각화
-    void UpdateWheelVisual(Transform trans, WheelCollider wheelCol)                                     //모든 바퀴가 굴러가고 바퀴가 돌아가게 비주얼 업데이트 관련 함수
+    void UpdateWheelVisual(Transform trans, WheelCollider wheelCol)
     {
         Vector3 UpdatePos;
         Quaternion UpdateRot;
 
-        wheelCol.GetWorldPose(out UpdatePos, out UpdateRot);                                            //휠 운동 연산 결과를 월드 좌표로 변환
+        //휠 운동 연산 결과를 월드 좌표로 변환
+        wheelCol.GetWorldPose(out UpdatePos, out UpdateRot);
 
         trans.position = UpdatePos;
         trans.rotation = UpdateRot;
@@ -301,39 +240,35 @@ public class Player : MonoBehaviour
     }
     void LightControl()
     {
-        t = Time.time;
+        float t = Time.time;
         if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
         {
             rec = LogitechGSDK.LogiGetStateUnity(0);
 
             // 오른쪽 방향지시등
-            if (LogitechGSDK.LogiButtonIsPressed(0, 4) && t - lastIndicatorChangeTime >= changeDelay)
+            if (LogitechGSDK.LogiButtonIsPressed(0, 5) && t - lastIndicatorChangeTime >= changeDelay)
             {
-                isRightIndicatorOn = !isRightIndicatorOn;                                                   // 상태 반전
-                rightSign.enabled = isRightIndicatorOn;
+                isRightIndicatorOn = !isRightIndicatorOn; // 상태 반전
                 if (isRightIndicatorOn)
                 {
-                    isLeftIndicatorOn = false;                                                              // 왼쪽 방향 끄기
-                    leftSign.enabled = false;
+                    isLeftIndicatorOn = false; // 왼쪽 방향 끄기
                     ToggleLights(effectinfo.leftLight, false);
                 }
                 ToggleLights(effectinfo.rightLight, isRightIndicatorOn);
-                lastIndicatorChangeTime = t;                                                                // 마지막 변경 시간 기록
+                lastIndicatorChangeTime = t; // 마지막 변경 시간 기록
             }
 
             // 왼쪽 방향지시등
-            if (LogitechGSDK.LogiButtonIsPressed(0, 5) && t - lastIndicatorChangeTime >= changeDelay)
+            if (LogitechGSDK.LogiButtonIsPressed(0, 4) && t - lastIndicatorChangeTime >= changeDelay)
             {
-                isLeftIndicatorOn = !isLeftIndicatorOn;                                                     // 상태 반전
-                leftSign.enabled = isLeftIndicatorOn;
+                isLeftIndicatorOn = !isLeftIndicatorOn; // 상태 반전
                 if (isLeftIndicatorOn)
                 {
-                    isRightIndicatorOn = false;                                                             // 오른쪽 방향 끄기
-                    rightSign.enabled = false;
+                    isRightIndicatorOn = false; // 오른쪽 방향 끄기
                     ToggleLights(effectinfo.rightLight, false);
                 }
                 ToggleLights(effectinfo.leftLight, isLeftIndicatorOn);
-                lastIndicatorChangeTime = t;                                                                // 마지막 변경 시간 기록
+                lastIndicatorChangeTime = t; // 마지막 변경 시간 기록
             }
             /*
             // 전방 라이트
@@ -356,16 +291,14 @@ public class Player : MonoBehaviour
             // 후진 라이트
             if (rec.lRz < 32766) // 후진 기어 위치
             {
-                ToggleLights(effectinfo.backLight, true);                                                   // 후진 불 켜기
+                ToggleLights(effectinfo.backLight, true); // 후진 불 켜기
             }
             else
             {
-                ToggleLights(effectinfo.backLight, false);                                                  // 후진 불 끄기
+                ToggleLights(effectinfo.backLight, false); // 후진 불 끄기
             }
         }
 
-        SignBlinking(leftSign, isLeftIndicatorOn, t);
-        SignBlinking(rightSign, isRightIndicatorOn, t);
         HandleBlinking(effectinfo.leftLight, isLeftIndicatorOn, t);
         HandleBlinking(effectinfo.rightLight, isRightIndicatorOn, t);
     }
@@ -374,7 +307,7 @@ public class Player : MonoBehaviour
     {
         foreach (Light light in lights)
         {
-            light.enabled = state ?? !light.enabled;                                                        // 상태에 따라 라이트 켜거나 끄기
+            light.enabled = state ?? !light.enabled; // 상태에 따라 라이트 켜거나 끄기
         }
     }
 
@@ -385,17 +318,8 @@ public class Player : MonoBehaviour
             lastBlinkTime = t;
             foreach (Light light in lights)
             {
-                light.enabled = !light.enabled;                                                             // 라이트 상태 깜빡임
+                light.enabled = !light.enabled; // 라이트 상태 깜빡임
             }
-        }
-    }
-
-    void SignBlinking(Text sign, bool isIndicatorOn, float t)
-    {
-        if (isIndicatorOn && t - lastBlinkTime >= blinkInterval)
-        {
-            lastBlinkTime = t;
-            sign.enabled = !sign.enabled;                                                                   // 방향지시등 상태 깜빡임
         }
     }
 
@@ -409,62 +333,15 @@ public class Player : MonoBehaviour
 
 
     }
-    void ShiftGear()
-    {
-        rec = LogitechGSDK.LogiGetStateUnity(0);
 
-        if (LogitechGSDK.LogiButtonIsPressed(0, 0))
-        {
-            gearInput = 0;
-            GearSign.text = "R";
-            GearSign.color = Color.yellow;
-        }
-        else if (LogitechGSDK.LogiButtonIsPressed(0, 1))
-        {
-            gearInput = 1;
-            GearSign.text = "P";
-            GearSign.color = Color.red;
-        }
-        else if (LogitechGSDK.LogiButtonIsPressed(0, 2))
-        {
-            gearInput = 2;
-            GearSign.text = "N";
-            GearSign.color = Color.yellow;
-        }
-        else if (LogitechGSDK.LogiButtonIsPressed(0, 3))
-        {
-            gearInput = 3;
-            GearSign.text = "D";
-            GearSign.color = Color.green;
-        }
+    float CalculateCurrentSpeed()
+    {
+        // 간단히 현재 속도를 계산하여 확인
+        float radius = frontRight.radius;
+        float rpm = frontRight.rpm;
+        return (rpm * 2 * Mathf.PI * radius) / 20000;
     }
 
-    void OnTriggerStay(Collider col)
-    {
-        if (col.CompareTag("TrafficSignArea"))
-        {
-            //빨간불일때 현재 위치를 일정시간 안에 통과하지 못하면 게임오버
-            Debug.Log("In TrafficSignArea");
-        }
-        if (col.CompareTag("LimitSpeedArea"))
-        {
-            float speed = SpeedCalaulator.GetComponent<SpeedCalculate>().speed;
-            if(limitSpeed < speed)
-            {
-                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-            }
-            Debug.Log("In LimitSpeedArea, Current Speed: " + speed);
-        }
-    }
-
-    void OnCollisionEnter(Collision collision)
-    {
-        if (collision.gameObject.CompareTag("Building"))
-        {
-            Debug.Log("Bumped Building");
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-        }
-    }
     //이펙트 제어 정보
     [System.Serializable]
     public struct EffectControlInfo
