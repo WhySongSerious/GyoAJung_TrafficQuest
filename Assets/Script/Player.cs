@@ -1,8 +1,10 @@
 using System.Collections;
 using System.Text;
+using UnityEditor.SearchService;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public enum InputCondition
 {
@@ -12,12 +14,14 @@ public enum InputCondition
 
 public class Player : MonoBehaviour
 {
+    [SerializeField] GameObject SpeedCalaulator;
+
     [Header("Anti-roll Bar Settings")]                                                              //Anti-roll 제어
     [SerializeField] public bool antiRollEnabled = true;                                            //Anti-roll on/off
     [SerializeField] private float antiRollForce = 5000f;                                           //A
 
     [Header("Wheel Colliders")]                                                                     //바퀴 제어
-    [SerializeField] WheelCollider frontRight;                      
+    [SerializeField] WheelCollider frontRight;
     [SerializeField] WheelCollider frontLeft;
     [SerializeField] WheelCollider rearRight;
     [SerializeField] WheelCollider rearLeft;
@@ -29,18 +33,22 @@ public class Player : MonoBehaviour
     [SerializeField] Transform rearLeftTransform;
 
     [Header("Text UI")]
-    [SerializeField] Text speedText;                                                        //속도 표시
     [SerializeField] Text rightSign;
     [SerializeField] Text leftSign;
+    [SerializeField] Text GearSign;
 
     //속도관련 변수
     private float accelerator;                                                                      //엑셀에 가하는 힘
+    private float reverseForce;
     private float brakeForce;                                                                       //브레이크에 가하는 힘
     private float currentAccelerator = 0f;                                                          //현재 엑셀을 어느 정도 밟았는지
+    private float currentReverseForce = 0f;
     private float currentBrakeForce = 0f;                                                           //현재 브레이크를 어느 정도 밟았는지
     private float currentTurnAngle = 0f;                                                            //현재 바퀴 각도
     private float maxTurnAngle = 6f;
     public int handleResistance = 30;                                                              //핸들 저항 변수
+    public int gearInput = 1;
+    public float limitSpeed = 50;
 
     public InputCondition inputcondition;                                                           //현재 Input이 wheel/keyboard 체크
 
@@ -64,7 +72,6 @@ public class Player : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
-
     }
 
     void Start()
@@ -81,12 +88,12 @@ public class Player : MonoBehaviour
     {
         if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))                           //wheel 업테이트 && 컨트롤러 중 0번째가 연결되어 있는지 체크
         {
+            ShiftGear();
+            Reverse();
             Accel();                                                                                //엑셀 제어 함수
             Brake();                                                                                //브레이크 제어 함수
             WheelControl();                                                                         //핸들 제어 함수
             LightControl();                                                                         //방향지시등과 같은 라이트 제어 함수
-
-            DisplaySpeed(CalculateCurrentSpeed());
 
             if (antiRollEnabled)                                                                    //Anti-roll on/off 체크
             {
@@ -110,7 +117,7 @@ public class Player : MonoBehaviour
 
         t = Time.deltaTime;
         switch (inputcondition)
-        {   
+        {
             case InputCondition.logitech_wheel:                                                     //wheel 제어 시
                 if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
                 {
@@ -125,7 +132,8 @@ public class Player : MonoBehaviour
                 Debug.Log("keyboard");
                 if (Input.GetKey(KeyCode.UpArrow))
                 {
-                    accelerator = 3;
+                    accelerator = 30000;
+                    currentAccelerator = accelerator;
                     initialVelocity += accelerator * t * Vector3.forward;
                     transform.Translate(initialVelocity * t + Vector3.forward * t * t * accelerator);
                     //Debug.Log("현재속도: " + initialVelocity.z + ", 가속도: " + accelerator);
@@ -135,7 +143,36 @@ public class Player : MonoBehaviour
                 break;
         }
     }
+    private void Reverse()
+    {
 
+        t = Time.deltaTime;
+        switch (inputcondition)
+        {
+            case InputCondition.logitech_wheel:                                                     //wheel 제어 시
+                if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
+                {
+                    rec = LogitechGSDK.LogiGetStateUnity(0);
+                    reverseForce = Mathf.Abs(rec.lY - 32767) / 1;                                    //엑셀을 얼마나 밟았는지 연산 (각도는 -32768 ~ 32767)
+                    currentReverseForce = reverseForce;
+                    Debug.Log("Logitech Accel Force: " + currentReverseForce / 10000);
+
+                }
+                break;
+            case InputCondition.keyboard:
+                Debug.Log("keyboard");
+                if (Input.GetKey(KeyCode.UpArrow))
+                {
+                    reverseForce = 3;
+                    initialVelocity += reverseForce * t * Vector3.forward;
+                    transform.Translate(initialVelocity * t + Vector3.forward * t * t * reverseForce);
+                    //Debug.Log("현재속도: " + initialVelocity.z + ", 가속도: " + reverseForce);
+                }
+                else
+                    transform.Translate(initialVelocity * t + Vector3.forward * t * t * reverseForce);
+                break;
+        }
+    }
     private void Brake()
     {
         t = Time.deltaTime;
@@ -179,8 +216,26 @@ public class Player : MonoBehaviour
     //휠 제어 함수
     void WheelControl()
     {
-        frontRight.motorTorque = currentAccelerator;                                                    //앞바퀴에 엑셀을 밟은 만큼의 힘을 전달하여 바퀴를 굴려줌
-        frontLeft.motorTorque = currentAccelerator;
+        switch (gearInput)
+        {
+            case 0:                                                                 //후진
+                frontRight.motorTorque = currentReverseForce;
+                frontLeft.motorTorque = currentReverseForce;
+                break;
+            case 1:                                                                 //주차
+                frontRight.motorTorque = 0;
+                frontLeft.motorTorque = 0;
+                break;
+            case 2:                                                                 //중립
+
+
+                break;
+            case 3:                                                                 //전진
+                frontRight.motorTorque = currentAccelerator;                                                    //앞바퀴에 엑셀을 밟은 만큼의 힘을 전달하여 바퀴를 굴려줌
+                frontLeft.motorTorque = currentAccelerator;
+                break;
+
+        }
 
         frontRight.brakeTorque = currentBrakeForce;                                                    //모든 바퀴에 브레이크를 밟은 만큼의 힘을 전달하여 바퀴를 멈춰줌
         frontLeft.brakeTorque = currentBrakeForce;
@@ -355,20 +410,62 @@ public class Player : MonoBehaviour
 
 
     }
-
-    float CalculateCurrentSpeed()
+    void ShiftGear()
     {
-        // 간단히 현재 속도를 계산하여 확인
-        float radius = frontRight.radius;
-        float rpm = frontRight.rpm;
-        return (rpm * 2 * Mathf.PI * radius) / 20000;
-    }
-    private void DisplaySpeed(float speed)
-    {
-        // 소수점제외한 후 속도 표시
-        speedText.text = $"{(int)speed} km/h";
+        rec = LogitechGSDK.LogiGetStateUnity(0);
+
+        if (LogitechGSDK.LogiButtonIsPressed(0, 0))
+        {
+            gearInput = 0;
+            GearSign.text = "R";
+            GearSign.color = Color.yellow;
+        }
+        else if (LogitechGSDK.LogiButtonIsPressed(0, 1))
+        {
+            gearInput = 1;
+            GearSign.text = "P";
+            GearSign.color = Color.red;
+        }
+        else if (LogitechGSDK.LogiButtonIsPressed(0, 2))
+        {
+            gearInput = 2;
+            GearSign.text = "N";
+            GearSign.color = Color.yellow;
+        }
+        else if (LogitechGSDK.LogiButtonIsPressed(0, 3))
+        {
+            gearInput = 3;
+            GearSign.text = "D";
+            GearSign.color = Color.green;
+        }
     }
 
+    void OnTriggerStay(Collider col)
+    {
+        if (col.CompareTag("TrafficSignArea"))
+        {
+            //빨간불일때 현재 위치를 일정시간 안에 통과하지 못하면 게임오버
+            Debug.Log("In TrafficSignArea");
+        }
+        if (col.CompareTag("LimitSpeedArea"))
+        {
+            float speed = SpeedCalaulator.GetComponent<SpeedCalculate>().speed;
+            if (limitSpeed < speed)
+            {
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            }
+            Debug.Log("In LimitSpeedArea, Current Speed: " + speed);
+        }
+    }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("Building"))
+        {
+            Debug.Log("Bumped Building");
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        }
+    }
     //이펙트 제어 정보
     [System.Serializable]
     public struct EffectControlInfo
