@@ -7,7 +7,7 @@ public class MainMenu : MonoBehaviour
 {
     public void OnClickGameStart()
     {
-        SceneManager.LoadScene("GameSelect"); //게임 선택창으로 이동
+        SceneManager.LoadScene("GameSelect"); 
         Debug.Log("변환 완료");
     }
 
