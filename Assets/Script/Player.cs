@@ -132,7 +132,6 @@ public class Player : MonoBehaviour
     private void Brake()
     {
         t = Time.deltaTime;
-        bool absActivated = false;
         switch (inputcondition)
         {
             case InputCondition.logitech_wheel:
