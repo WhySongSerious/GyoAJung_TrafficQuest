@@ -37,8 +37,13 @@ public class Player : MonoBehaviour
     [SerializeField] Text leftSign;
     [SerializeField] Text GearSign;
 
+    [Header("Image UI")]
+    [SerializeField] Image LimitSpeedImage;
+
+    [Header("Traffic System")]
     [SerializeField] GameObject TrafficLight;
     public bool isRedLight;
+    bool checkingTrafficLight;
 
     //속도관련 변수
     private float accelerator;                                                                      //엑셀에 가하는 힘
@@ -75,11 +80,14 @@ public class Player : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
-       
     }
 
     void Start()
     {
+        LimitSpeedImage.enabled = !enabled;
+        leftSign.enabled = !enabled;
+        rightSign.enabled = !enabled;
+        ShiftGear();
         Debug.Log("SteeringInit:" + LogitechGSDK.LogiSteeringInitialize(false));                    //wheel 연결이 되어 있는지 체크
     }
     void OnApplicationQuit()
@@ -103,8 +111,7 @@ public class Player : MonoBehaviour
             {
                 ApplyAntiRoll();                                                                    //Anti-roll 제어 함수
             }
-
-            Re();                                                                                   //지정된 자리로 돌아오고 각도도 초기화
+                                                                               //지정된 자리로 돌아오고 각도도 초기화
         }
         else if (!LogitechGSDK.LogiIsConnected(0))
         {
@@ -158,7 +165,7 @@ public class Player : MonoBehaviour
                 {
                     rec = LogitechGSDK.LogiGetStateUnity(0);
                     reverseForce = Mathf.Abs(rec.lY - 32767) / 1;                                    //엑셀을 얼마나 밟았는지 연산 (각도는 -32768 ~ 32767)
-                    currentReverseForce = reverseForce;
+                    currentReverseForce = -reverseForce;
                     Debug.Log("Logitech Accel Force: " + currentReverseForce / 10000);
 
                 }
@@ -404,15 +411,10 @@ public class Player : MonoBehaviour
         }
     }
 
-    private void Re()
+    IEnumerator ReStart()
     {
-        if (Input.GetKey(KeyCode.R))
-        {
-            this.transform.position = new Vector3(0, 3, -220);
-            this.transform.rotation = Quaternion.identity;
-        }
-
-
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        yield return new WaitForSeconds(1f);
     }
     void ShiftGear()
     {
@@ -444,23 +446,48 @@ public class Player : MonoBehaviour
         }
     }
 
+    IEnumerator CheckTrafficLight()
+    {
+        yield return new WaitForSeconds(8f);
+        if (checkingTrafficLight)
+            StartCoroutine(ReStart());
+    }
+
     void OnTriggerStay(Collider col)
     {
-        isRedLight = TrafficLight.GetComponent<TrafficLightController>().redLight;
-        if (col.CompareTag("TrafficLightArea") && isRedLight == true)
+        if (col.CompareTag("TrafficLightArea"))
         {
-            //빨간불일때 현재 위치를 일정시간 안에 통과하지 못하면 게임오버
-            Debug.Log("In TrafficLightArea");
-
+            isRedLight = TrafficLight.GetComponent<TrafficLightController>().redLight;
+            if (isRedLight)
+            {
+                checkingTrafficLight = true;
+                //빨간불일때 현재 위치를 일정시간 안에 통과하지 못하면 게임오버
+                StartCoroutine(CheckTrafficLight());
+                Debug.Log("In TrafficLightArea" + "  current isRedLight: " + checkingTrafficLight + "  current Checking Traffic Light: " + checkingTrafficLight);
+            }
         }
         if (col.CompareTag("LimitSpeedArea"))
         {
             float speed = SpeedCalaulator.GetComponent<SpeedCalculate>().speed;
+            LimitSpeedImage.enabled = enabled;
             if (limitSpeed < speed)
             {
-                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                StartCoroutine(ReStart());
             }
             Debug.Log("In LimitSpeedArea, Current Speed: " + speed);
+        }
+    }
+
+    private void OnTriggerExit(Collider col)
+    {
+        if (col.CompareTag("TrafficLightArea"))
+        {
+            checkingTrafficLight = false;
+            Debug.Log("In TrafficLightArea" + "  current isRedLight: " + checkingTrafficLight + "  current Checking Traffic Light: " + checkingTrafficLight);
+        }
+        if (col.CompareTag("LimitSpeedArea"))
+        {
+            LimitSpeedImage.enabled = !enabled;
         }
     }
 
@@ -469,7 +496,7 @@ public class Player : MonoBehaviour
         if (collision.gameObject.CompareTag("Building"))
         {
             Debug.Log("Bumped Building");
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            StartCoroutine(ReStart());
         }
     }
     //이펙트 제어 정보

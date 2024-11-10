@@ -39,8 +39,8 @@ public class TrafficLightController : MonoBehaviour
     IEnumerator ChangeToRed()
     {
         redLight = true;
-        mats[1] = red;
-        mats[2] = green;
+        mats[1] = green;
+        mats[2] = red;
         TrafficLightRender.sharedMaterials = mats;
         yield return new WaitForSeconds(waitTime);
         StartCoroutine(ChangeToGreen());
@@ -49,8 +49,8 @@ public class TrafficLightController : MonoBehaviour
     IEnumerator ChangeToGreen()
     {
         redLight = false;
-        mats[1] = green;
-        mats[2] = red;
+        mats[1] = red;
+        mats[2] = green;
         TrafficLightRender.sharedMaterials = mats;
         yield return new WaitForSeconds(waitTime);
         StartCoroutine(ChangeToRed());
