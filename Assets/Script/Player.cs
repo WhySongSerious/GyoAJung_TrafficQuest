@@ -37,6 +37,9 @@ public class Player : MonoBehaviour
     [SerializeField] Text leftSign;
     [SerializeField] Text GearSign;
 
+    [SerializeField] GameObject TrafficLight;
+    public bool isRedLight;
+
     //속도관련 변수
     private float accelerator;                                                                      //엑셀에 가하는 힘
     private float reverseForce;
@@ -72,6 +75,7 @@ public class Player : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+       
     }
 
     void Start()
@@ -442,10 +446,12 @@ public class Player : MonoBehaviour
 
     void OnTriggerStay(Collider col)
     {
-        if (col.CompareTag("TrafficSignArea"))
+        isRedLight = TrafficLight.GetComponent<TrafficLightController>().redLight;
+        if (col.CompareTag("TrafficLightArea") && isRedLight == true)
         {
             //빨간불일때 현재 위치를 일정시간 안에 통과하지 못하면 게임오버
-            Debug.Log("In TrafficSignArea");
+            Debug.Log("In TrafficLightArea");
+
         }
         if (col.CompareTag("LimitSpeedArea"))
         {

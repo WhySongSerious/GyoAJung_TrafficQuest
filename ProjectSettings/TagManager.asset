@@ -5,8 +5,12 @@ TagManager:
   serializedVersion: 2
   tags:
   - LimitSpeedArea
-  - TrafficSignArea
   - Building
+  - concrete
+  - dirt
+  - wood
+  - water
+  - TrafficLightArea
   layers:
   - Default
   - TransparentFX
