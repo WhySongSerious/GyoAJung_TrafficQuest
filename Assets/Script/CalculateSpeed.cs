@@ -16,7 +16,7 @@ public class SpeedCalculate : MonoBehaviour
     void FixedUpdate()
     {
         m_Speed = GetSpeed();
-        speed = m_Speed * 2.1f;
+        speed = m_Speed * 10f;
         speedui.GetComponent<Text>().text = string.Format("{0:00} km/h", speed);
 
     }

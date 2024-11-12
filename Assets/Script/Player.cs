@@ -43,7 +43,9 @@ public class Player : MonoBehaviour
     [Header("Traffic System")]
     [SerializeField] GameObject TrafficLight;
     public bool isRedLight;
-    bool checkingTrafficLight;
+    private bool checkingTrafficLight = false;
+    private bool checkingLimit = false;
+    private bool checkingFinish = false;
 
     //속도관련 변수
     private float accelerator;                                                                      //엑셀에 가하는 힘
@@ -53,11 +55,20 @@ public class Player : MonoBehaviour
     private float currentReverseForce = 0f;
     private float currentBrakeForce = 0f;                                                           //현재 브레이크를 어느 정도 밟았는지
     private float currentTurnAngle = 0f;                                                            //현재 바퀴 각도
-    private float maxTurnAngle = 6f;
+    private float maxTurnAngle = 30f;
+    public float basicResistance = 0f;
+
+
+    [Header("Handle Resistance")]
     public int handleResistance = 30;                                                              //핸들 저항 변수
+
+    [Header("Gear")]
     public int gearInput = 1;
+
+    [Header("Limit Speed")]
     public float limitSpeed = 50;
 
+    [Header("Input Condition")]
     public InputCondition inputcondition;                                                           //현재 Input이 wheel/keyboard 체크
 
     private float t;                                                                                //시간 측정 변수
@@ -84,18 +95,20 @@ public class Player : MonoBehaviour
 
     void Start()
     {
+        Debug.Log("SteeringInit:" + LogitechGSDK.LogiSteeringInitialize(false));                    //wheel 연결이 되어 있는지 체크
         LimitSpeedImage.enabled = !enabled;
         leftSign.enabled = !enabled;
         rightSign.enabled = !enabled;
-        ShiftGear();
-        Debug.Log("SteeringInit:" + LogitechGSDK.LogiSteeringInitialize(false));                    //wheel 연결이 되어 있는지 체크
-    }
-    void OnApplicationQuit()
-    {
-        Debug.Log("SteeringShutdown:" + LogitechGSDK.LogiSteeringShutdown());                       //종료할 때 wheel 연결을 끊어 주는지 체크
+        checkingFinish = false;
+        LogitechGSDK.LogiPlayDamperForce(0, handleResistance);
     }
 
-    // Update is called once per frame
+    //종료할 때 wheel 연결을 끊어 주는지 체크
+    void OnApplicationQuit()
+    {
+        Debug.Log("SteeringShutdown:" + LogitechGSDK.LogiSteeringShutdown());                       
+    }
+
     void FixedUpdate()
     {
         if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))                           //wheel 업테이트 && 컨트롤러 중 0번째가 연결되어 있는지 체크
@@ -106,12 +119,7 @@ public class Player : MonoBehaviour
             Brake();                                                                                //브레이크 제어 함수
             WheelControl();                                                                         //핸들 제어 함수
             LightControl();                                                                         //방향지시등과 같은 라이트 제어 함수
-
-            if (antiRollEnabled)                                                                    //Anti-roll on/off 체크
-            {
-                ApplyAntiRoll();                                                                    //Anti-roll 제어 함수
-            }
-                                                                               //지정된 자리로 돌아오고 각도도 초기화
+            ApplyAntiRoll();                                                                         //Anti-roll 제어 함수
         }
         else if (!LogitechGSDK.LogiIsConnected(0))
         {
@@ -125,7 +133,6 @@ public class Player : MonoBehaviour
 
     private void Accel()
     {
-
         t = Time.deltaTime;
         switch (inputcondition)
         {
@@ -133,9 +140,9 @@ public class Player : MonoBehaviour
                 if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
                 {
                     rec = LogitechGSDK.LogiGetStateUnity(0);
-                    accelerator = Mathf.Abs(rec.lY - 32767) / 1;                                    //엑셀을 얼마나 밟았는지 연산 (각도는 -32768 ~ 32767)
-                    currentAccelerator = accelerator;
-                    Debug.Log("Logitech Accel Force: " + currentAccelerator / 10000);
+                    accelerator = Mathf.Abs(rec.lY - 32767) / 5000;                                    //엑셀을 얼마나 밟았는지 연산 (각도는 -32768 ~ 32767)
+                    currentAccelerator += accelerator * t;
+                    //Debug.Log("Logitech Accel Force: " + currentAccelerator);
 
                 }
                 break;
@@ -156,7 +163,6 @@ public class Player : MonoBehaviour
     }
     private void Reverse()
     {
-
         t = Time.deltaTime;
         switch (inputcondition)
         {
@@ -164,9 +170,9 @@ public class Player : MonoBehaviour
                 if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
                 {
                     rec = LogitechGSDK.LogiGetStateUnity(0);
-                    reverseForce = Mathf.Abs(rec.lY - 32767) / 1;                                    //엑셀을 얼마나 밟았는지 연산 (각도는 -32768 ~ 32767)
-                    currentReverseForce = -reverseForce;
-                    Debug.Log("Logitech Accel Force: " + currentReverseForce / 10000);
+                    reverseForce = Mathf.Abs(rec.lY - 32767) / 5000;                                    //엑셀을 얼마나 밟았는지 연산 (각도는 -32768 ~ 32767)
+                    currentReverseForce += reverseForce * t;
+                    Debug.Log("Logitech Accel Force: " + currentReverseForce);
 
                 }
                 break;
@@ -195,7 +201,20 @@ public class Player : MonoBehaviour
                     rec = LogitechGSDK.LogiGetStateUnity(0);
                     brakeForce = Mathf.Abs(rec.lRz - 32767) * 100;                                    //브레이크를 얼마나 밟았는지 연산 (각도는 -32768 ~ 32767)
                     //Debug.Log("Logitech Brake Force: " + brakeForce / 100);
-
+                    if(brakeForce > 1)
+                    {
+                        if(currentAccelerator != 0 || currentReverseForce != 0)
+                        {
+                            currentAccelerator = -brakeForce;
+                            currentReverseForce = -brakeForce;
+                        }
+                        else
+                        {
+                            currentAccelerator = 0;
+                            currentReverseForce = 0;
+                        }
+                        
+                    }
                     currentBrakeForce = brakeForce;
                     //Debug.Log("현재속도: " + initialVelocity.z + ", 가속도: " + brakeForce);
                 }
@@ -227,23 +246,52 @@ public class Player : MonoBehaviour
     //휠 제어 함수
     void WheelControl()
     {
+        float speed = SpeedCalaulator.GetComponent<SpeedCalculate>().speed;
         switch (gearInput)
         {
             case 0:                                                                 //후진
-                frontRight.motorTorque = currentReverseForce;
-                frontLeft.motorTorque = currentReverseForce;
+                if (reverseForce < 1)
+                {
+                    if (speed > 20)
+                    {
+                        currentReverseForce = -basicResistance;
+                    }
+                    else if (speed <= 20)
+                    {
+                        currentReverseForce = 40;
+                    }
+                }
+                frontRight.motorTorque = -currentReverseForce;
+                frontLeft.motorTorque = -currentReverseForce;
+                Debug.Log("motorTorque Reverse Force: " + currentReverseForce);
                 break;
+
             case 1:                                                                 //주차
                 frontRight.motorTorque = 0;
                 frontLeft.motorTorque = 0;
                 break;
+
             case 2:                                                                 //중립
-
-
+                frontRight.motorTorque = 0;
+                frontLeft.motorTorque = 0;
                 break;
+
             case 3:                                                                 //전진
+                if (accelerator < 1)
+                {
+                    if (speed > 20)
+                    {
+                        currentAccelerator = -basicResistance;
+                    }
+                    else if (speed <= 20)
+                    {
+                        currentAccelerator = 40;
+                    }
+                }
+
                 frontRight.motorTorque = currentAccelerator;                                                    //앞바퀴에 엑셀을 밟은 만큼의 힘을 전달하여 바퀴를 굴려줌
                 frontLeft.motorTorque = currentAccelerator;
+                Debug.Log("motorTorque Accel Force: " + accelerator);
                 break;
 
         }
@@ -419,30 +467,33 @@ public class Player : MonoBehaviour
     void ShiftGear()
     {
         rec = LogitechGSDK.LogiGetStateUnity(0);
-
-        if (LogitechGSDK.LogiButtonIsPressed(0, 0))
+         float speed = SpeedCalaulator.GetComponent<SpeedCalculate>().speed;
+        if (speed <= 1)
         {
-            gearInput = 0;
-            GearSign.text = "R";
-            GearSign.color = Color.yellow;
-        }
-        else if (LogitechGSDK.LogiButtonIsPressed(0, 1))
-        {
-            gearInput = 1;
-            GearSign.text = "P";
-            GearSign.color = Color.red;
-        }
-        else if (LogitechGSDK.LogiButtonIsPressed(0, 2))
-        {
-            gearInput = 2;
-            GearSign.text = "N";
-            GearSign.color = Color.yellow;
-        }
-        else if (LogitechGSDK.LogiButtonIsPressed(0, 3))
-        {
-            gearInput = 3;
-            GearSign.text = "D";
-            GearSign.color = Color.green;
+            if (LogitechGSDK.LogiButtonIsPressed(0, 0))
+            {
+                gearInput = 0;
+                GearSign.text = "R";
+                GearSign.color = Color.yellow;
+            }
+            else if (LogitechGSDK.LogiButtonIsPressed(0, 1))
+            {
+                gearInput = 1;
+                GearSign.text = "P";
+                GearSign.color = Color.red;
+            }
+            else if (LogitechGSDK.LogiButtonIsPressed(0, 2))
+            {
+                gearInput = 2;
+                GearSign.text = "N";
+                GearSign.color = Color.yellow;
+            }
+            else if (LogitechGSDK.LogiButtonIsPressed(0, 3))
+            {
+                gearInput = 3;
+                GearSign.text = "D";
+                GearSign.color = Color.green;
+            }
         }
     }
 
@@ -451,6 +502,19 @@ public class Player : MonoBehaviour
         yield return new WaitForSeconds(8f);
         if (checkingTrafficLight)
             StartCoroutine(ReStart());
+    }
+    IEnumerator CheckingLimitSpeed()
+    {
+        yield return new WaitForSeconds(8f);
+        if (checkingLimit)
+            StartCoroutine(ReStart());
+    }
+
+    IEnumerator FinishGame()
+    {
+        yield return new WaitForSeconds(3f);
+        if(checkingFinish)
+            SceneManager.LoadScene("GameSelect");
     }
 
     void OnTriggerStay(Collider col)
@@ -469,12 +533,24 @@ public class Player : MonoBehaviour
         if (col.CompareTag("LimitSpeedArea"))
         {
             float speed = SpeedCalaulator.GetComponent<SpeedCalculate>().speed;
-            LimitSpeedImage.enabled = enabled;
-            if (limitSpeed < speed)
+            LimitSpeedImage.enabled = true;
+            if (limitSpeed + 9 < speed)
             {
-                StartCoroutine(ReStart());
+                checkingLimit = true;
+                StartCoroutine(CheckingLimitSpeed());
             }
+            else
+                checkingLimit = false;
             Debug.Log("In LimitSpeedArea, Current Speed: " + speed);
+        }
+        if (col.CompareTag("Finish"))
+        {
+            checkingFinish = true;
+            //Debug.Log(checkingFinish);
+            if (gearInput == 1)
+            {
+                StartCoroutine(FinishGame());
+            }
         }
     }
 
@@ -487,7 +563,12 @@ public class Player : MonoBehaviour
         }
         if (col.CompareTag("LimitSpeedArea"))
         {
-            LimitSpeedImage.enabled = !enabled;
+            checkingLimit = false;
+            LimitSpeedImage.enabled = false;
+        }
+        if (col.CompareTag("Finish"))
+        {
+            checkingFinish = false;
         }
     }
 

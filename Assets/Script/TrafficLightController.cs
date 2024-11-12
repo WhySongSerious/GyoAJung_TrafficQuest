@@ -13,7 +13,6 @@ public class TrafficLightController : MonoBehaviour
     void Start()
     {
         mats = TrafficLightRender.sharedMaterials;
-        Debug.Log(mats + " " + mats.Length);
         if (mats.Length > 2)
             StartCoroutine(ChangeToRed());
         else
