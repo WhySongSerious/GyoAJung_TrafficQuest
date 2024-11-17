@@ -111,25 +111,40 @@ public class Player : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))                           //wheel 업테이트 && 컨트롤러 중 0번째가 연결되어 있는지 체크
+        switch (inputcondition)
         {
-            ShiftGear();
-            Reverse();
-            Accel();                                                                                //엑셀 제어 함수
-            Brake();                                                                                //브레이크 제어 함수
-            WheelControl();                                                                         //핸들 제어 함수
-            LightControl();                                                                         //방향지시등과 같은 라이트 제어 함수
-            ApplyAntiRoll();                                                                         //Anti-roll 제어 함수
+            case InputCondition.logitech_wheel:
+                if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))                           //wheel 업테이트 && 컨트롤러 중 0번째가 연결되어 있는지 체크
+                {
+                    ShiftGear();
+                    Reverse();
+                    Accel();                                                                                //엑셀 제어 함수
+                    Brake();                                                                                //브레이크 제어 함수
+                    WheelControl();                                                                         //핸들 제어 함수
+                    LightControl();                                                                         //방향지시등과 같은 라이트 제어 함수
+                    ApplyAntiRoll();                                                                         //Anti-roll 제어 함수
+                }
+                else if (!LogitechGSDK.LogiIsConnected(0))
+                {
+                    Debug.Log("PLEASE PLUG IN A STEERING WHEEL OR A FORCE FEEDBACK CONTROLLER");
+                }
+                else
+                {
+                    Debug.Log("THIS WINDOW NEEDS TO BE IN FOREGROUND IN ORDER FOR THE SDK TO WORK PROPERLY");
+                }
+                break;
+            case InputCondition.keyboard:
+                ShiftGear();
+                Reverse();
+                Accel();                                                                                
+                Brake();                                                                                
+                WheelControl();                                                                         
+                LightControl();                                                                         
+                ApplyAntiRoll();
+                break;
         }
-        else if (!LogitechGSDK.LogiIsConnected(0))
-        {
-            Debug.Log("PLEASE PLUG IN A STEERING WHEEL OR A FORCE FEEDBACK CONTROLLER");
+        
         }
-        else
-        {
-            Debug.Log("THIS WINDOW NEEDS TO BE IN FOREGROUND IN ORDER FOR THE SDK TO WORK PROPERLY");
-        }
-    }
 
     private void Accel()
     {
@@ -150,14 +165,10 @@ public class Player : MonoBehaviour
                 Debug.Log("keyboard");
                 if (Input.GetKey(KeyCode.UpArrow))
                 {
-                    accelerator = 30000;
-                    currentAccelerator = accelerator;
-                    initialVelocity += accelerator * t * Vector3.forward;
-                    transform.Translate(initialVelocity * t + Vector3.forward * t * t * accelerator);
+                    accelerator = 6;
+                    currentAccelerator += accelerator * t;
                     //Debug.Log("현재속도: " + initialVelocity.z + ", 가속도: " + accelerator);
                 }
-                else
-                    transform.Translate(initialVelocity * t + Vector3.forward * t * t * accelerator);
                 break;
         }
     }
@@ -180,13 +191,10 @@ public class Player : MonoBehaviour
                 Debug.Log("keyboard");
                 if (Input.GetKey(KeyCode.UpArrow))
                 {
-                    reverseForce = 3;
-                    initialVelocity += reverseForce * t * Vector3.forward;
-                    transform.Translate(initialVelocity * t + Vector3.forward * t * t * reverseForce);
+                    reverseForce = 6;
+                    currentReverseForce += reverseForce * t;
                     //Debug.Log("현재속도: " + initialVelocity.z + ", 가속도: " + reverseForce);
                 }
-                else
-                    transform.Translate(initialVelocity * t + Vector3.forward * t * t * reverseForce);
                 break;
         }
     }
@@ -213,7 +221,6 @@ public class Player : MonoBehaviour
                             currentAccelerator = 0;
                             currentReverseForce = 0;
                         }
-                        
                     }
                     currentBrakeForce = brakeForce;
                     //Debug.Log("현재속도: " + initialVelocity.z + ", 가속도: " + brakeForce);
@@ -222,23 +229,14 @@ public class Player : MonoBehaviour
             case InputCondition.keyboard:
                 if (Input.GetKey(KeyCode.Space))
                 {
-
-                    Debug.Log("현재속도: " + initialVelocity.z + ", 가속도: -" + brakeForce);
-                    if (initialVelocity.z <= 0)
-                    {
-                        brakeForce = initialVelocity.z;
-                        initialVelocity.z = 0;
-                    }
-                    else
-                    {
-                        brakeForce = 3;
-                        initialVelocity -= brakeForce * t * Vector3.forward;
-                    }
-
-                    transform.Translate(initialVelocity * t - Vector3.forward * t * t * brakeForce);
+                    brakeForce += 60;
+                    currentAccelerator = 0;
+                    currentReverseForce = 0;
                 }
                 else
-                    brakeForce = 0f;                                                                    //브레이크에서 발을 떼었을 때는 항상 브레이크를 걸어주지 않음
+                    brakeForce = 0;
+
+                currentBrakeForce = brakeForce;
                 break;
         }
     }
@@ -466,34 +464,67 @@ public class Player : MonoBehaviour
     }
     void ShiftGear()
     {
-        rec = LogitechGSDK.LogiGetStateUnity(0);
-         float speed = SpeedCalaulator.GetComponent<SpeedCalculate>().speed;
-        if (speed <= 1)
+        float speed = SpeedCalaulator.GetComponent<SpeedCalculate>().speed;
+        switch (inputcondition)
         {
-            if (LogitechGSDK.LogiButtonIsPressed(0, 0))
-            {
-                gearInput = 0;
-                GearSign.text = "R";
-                GearSign.color = Color.yellow;
-            }
-            else if (LogitechGSDK.LogiButtonIsPressed(0, 1))
-            {
-                gearInput = 1;
-                GearSign.text = "P";
-                GearSign.color = Color.red;
-            }
-            else if (LogitechGSDK.LogiButtonIsPressed(0, 2))
-            {
-                gearInput = 2;
-                GearSign.text = "N";
-                GearSign.color = Color.yellow;
-            }
-            else if (LogitechGSDK.LogiButtonIsPressed(0, 3))
-            {
-                gearInput = 3;
-                GearSign.text = "D";
-                GearSign.color = Color.green;
-            }
+            case InputCondition.logitech_wheel:
+                rec = LogitechGSDK.LogiGetStateUnity(0);
+                if (speed <= 1)
+                {
+                    if (LogitechGSDK.LogiButtonIsPressed(0, 0))
+                    {
+                        gearInput = 0;
+                        GearSign.text = "R";
+                        GearSign.color = Color.yellow;
+                    }
+                    else if (LogitechGSDK.LogiButtonIsPressed(0, 1))
+                    {
+                        gearInput = 1;
+                        GearSign.text = "P";
+                        GearSign.color = Color.red;
+                    }
+                    else if (LogitechGSDK.LogiButtonIsPressed(0, 2))
+                    {
+                        gearInput = 2;
+                        GearSign.text = "N";
+                        GearSign.color = Color.yellow;
+                    }
+                    else if (LogitechGSDK.LogiButtonIsPressed(0, 3))
+                    {
+                        gearInput = 3;
+                        GearSign.text = "D";
+                        GearSign.color = Color.green;
+                    }
+                }break;
+            case InputCondition.keyboard:
+                if (speed <= 1)
+                {
+                    if (Input.GetKey(KeyCode.P))
+                    {
+                        gearInput = 0;
+                        GearSign.text = "R";
+                        GearSign.color = Color.yellow;
+                    }
+                    else if (Input.GetKey(KeyCode.O))
+                    {
+                        gearInput = 1;
+                        GearSign.text = "P";
+                        GearSign.color = Color.red;
+                    }
+                    else if (Input.GetKey(KeyCode.I))
+                    {
+                        gearInput = 2;
+                        GearSign.text = "N";
+                        GearSign.color = Color.yellow;
+                    }
+                    else if (Input.GetKey(KeyCode.U))
+                    {
+                        gearInput = 3;
+                        GearSign.text = "D";
+                        GearSign.color = Color.green;
+                    }
+                }
+                    break;
         }
     }
 
