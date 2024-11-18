@@ -4,43 +4,54 @@ using UnityEngine.UI;
 
 public class NavigationImageController : MonoBehaviour
 {
-    [SerializeField] Image image;
-
-    public bool isPopImage;
+    [SerializeField] Image R_image;
+    [SerializeField] Image L_image;
+    Image currentImage;
 
     void Start()
     {
-        Color color = image.color;
-        color.a = 20;
-        image.enabled = false;
-        isPopImage = false;
+        R_image.enabled = false;
+        L_image.enabled = false;
     }
     IEnumerator PopImage()
     {
-        image.enabled = true;
-        BlinkImage();
-        yield return new WaitForSeconds(10f);
-        isPopImage = false;
-        image.enabled = false;
+        currentImage.enabled = true;
+        yield return StartCoroutine(BlinkImage());
+        currentImage.enabled = false;
     }
 
-    void BlinkImage()
+    IEnumerator BlinkImage()
     {
-        for(int i = 0; i < 10; i++)
+        Color color = currentImage.color;
+        for (int i = 0; i < 6; i++)
         {
-            Color color = image.color;
-            color.a = 200;
-            new WaitForSeconds(0.5f);
-            color.a = 100;
-            new WaitForSeconds(0.5f);
+            Debug.Log("³²Àº È½¼ö: " + (5 - i));
+            color.a = 0.3f;
+            currentImage.color = color;
+            yield return new WaitForSeconds(1f);
+            color.a = 0.7f;
+            currentImage.color = color;
+            yield return new WaitForSeconds(1f);
         }
     }
 
     private void OnTriggerEnter(Collider collider)
     {
-        if (collider.CompareTag("NavigateRight") && isPopImage == false)
+        if (collider.CompareTag("NavigateRight"))
         {
-            isPopImage = true;
+            R_image.enabled = false;
+            L_image.enabled = false;
+            currentImage = R_image;
+            StopAllCoroutines();
+            StartCoroutine(PopImage());
+        }
+
+        if (collider.CompareTag("NavigateLeft"))
+        {
+            L_image.enabled = false;
+            R_image.enabled = false;
+            currentImage = L_image;
+            StopAllCoroutines();
             StartCoroutine(PopImage());
         }
     }
