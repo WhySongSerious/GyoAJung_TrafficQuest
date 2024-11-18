@@ -5,10 +5,10 @@ using UnityEngine;
 public class TrafficLightController : MonoBehaviour
 {
     [SerializeField] private Renderer TrafficLightRender;
-    [SerializeField] private Material red, green;
+    [SerializeField] private Material red, green, Yellow;
     private Material[] mats;
     public bool redLight;
-    private float waitTime = 10f;
+    private float waitTime = 20f;
 
     void Start()
     {
@@ -20,6 +20,9 @@ public class TrafficLightController : MonoBehaviour
     }
     IEnumerator ChangeRed()
     {
+        mats[1] = Yellow;
+        TrafficLightRender.sharedMaterials = mats;
+        yield return new WaitForSeconds(5f);
         redLight = true;
         mats[1] = red;
         TrafficLightRender.sharedMaterials = mats;
@@ -37,6 +40,9 @@ public class TrafficLightController : MonoBehaviour
     }
     IEnumerator ChangeToRed()
     {
+        mats[2] = Yellow;
+        TrafficLightRender.sharedMaterials = mats;
+        yield return new WaitForSeconds(5f);
         redLight = true;
         mats[1] = green;
         mats[2] = red;

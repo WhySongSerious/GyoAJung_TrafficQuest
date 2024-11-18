@@ -14,11 +14,7 @@ public enum InputCondition
 
 public class Player : MonoBehaviour
 {
-    [SerializeField] GameObject SpeedCalaulator;
-
-    [Header("Anti-roll Bar Settings")]                                                              //Anti-roll 제어
-    [SerializeField] public bool antiRollEnabled = true;                                            //Anti-roll on/off
-    [SerializeField] private float antiRollForce = 5000f;                                           //A
+    public EffectControlInfo effectinfo;                                                            //라이트 제어
 
     [Header("Wheel Colliders")]                                                                     //바퀴 제어
     [SerializeField] WheelCollider frontRight;
@@ -37,15 +33,16 @@ public class Player : MonoBehaviour
     [SerializeField] Text leftSign;
     [SerializeField] Text GearSign;
 
-    [Header("Image UI")]
-    [SerializeField] Image LimitSpeedImage;
-
     [Header("Traffic System")]
     [SerializeField] GameObject TrafficLight;
-    public bool isRedLight;
+    private bool isRedLight;
     private bool checkingTrafficLight = false;
     private bool checkingLimit = false;
     private bool checkingFinish = false;
+
+    [Header("Speed")]
+    [SerializeField] GameObject SpeedCalculator;
+    [SerializeField] Image LimitSpeedImage;
 
     //속도관련 변수
     private float accelerator;                                                                      //엑셀에 가하는 힘
@@ -56,17 +53,20 @@ public class Player : MonoBehaviour
     private float currentBrakeForce = 0f;                                                           //현재 브레이크를 어느 정도 밟았는지
     private float currentTurnAngle = 0f;                                                            //현재 바퀴 각도
     private float maxTurnAngle = 30f;
-    public float basicResistance = 0f;
 
+    private float basicResistance = 1f;
+
+    [Header("Anti-Roll")]
+    private float antiRollForce = 5000f;                                                            //Anri-roll 강도
 
     [Header("Handle Resistance")]
-    public int handleResistance = 30;                                                              //핸들 저항 변수
+    private int handleResistance = 30;                                                              //핸들 저항 변수
 
     [Header("Gear")]
-    public int gearInput = 1;
+    private int gearInput = 1;
 
     [Header("Limit Speed")]
-    public float limitSpeed = 50;
+    private float limitSpeed = 50;
 
     [Header("Input Condition")]
     public InputCondition inputcondition;                                                           //현재 Input이 wheel/keyboard 체크
@@ -77,14 +77,14 @@ public class Player : MonoBehaviour
 
     static LogitechGSDK.DIJOYSTATE2ENGINES rec;                                                     //wheel에 담긴 변수를 쓰게 해줌
 
-    public float blinkInterval = 0.5f;                                                              //방향지시등이 켜졌을 때 깜박임 간격 (초)
+    [Header("Light")]
+    //private bool isFrontIndicatorOn = false;                                                      //전조등이 켜져있는지 체크
+    private float blinkInterval = 0.52f;                                                              //방향지시등이 켜졌을 때 깜박임 간격 (초)
     private bool isLeftIndicatorOn = false;                                                         //좌측 방향지시등이 켜져있는지 체크
     private bool isRightIndicatorOn = false;                                                        //우측 방향지시등이 켜져있는지 체크
-    //private bool isFrontIndicatorOn = false;                                                      //전조등이 켜져있는지 체크
     private float lastBlinkTime;                                                                    //방향지시등이 깜빡일 때 언제를 기준으로 켜지고 꺼질지를 판단하는 변수
     private float lastIndicatorChangeTime = -1f;                                                    //방향지시등을 켜고 끌 때 입력값이 중복되는 경우를 방지하기 위해 딜레이 관련 변수
     private float changeDelay = 0.5f;                                                               //방향지시등을 켜고 끌 때 입력값이 중복되는 경우를 방지하기 위해 딜레이 관련 변수
-    public EffectControlInfo effectinfo;                                                            //라이트 제어
 
     private Rigidbody rb;
 
@@ -100,6 +100,7 @@ public class Player : MonoBehaviour
         leftSign.enabled = !enabled;
         rightSign.enabled = !enabled;
         checkingFinish = false;
+        ToggleLights(effectinfo.backLight, false);
         LogitechGSDK.LogiPlayDamperForce(0, handleResistance);
     }
 
@@ -172,6 +173,7 @@ public class Player : MonoBehaviour
                 break;
         }
     }
+
     private void Reverse()
     {
         t = Time.deltaTime;
@@ -198,6 +200,7 @@ public class Player : MonoBehaviour
                 break;
         }
     }
+
     private void Brake()
     {
         t = Time.deltaTime;
@@ -244,7 +247,7 @@ public class Player : MonoBehaviour
     //휠 제어 함수
     void WheelControl()
     {
-        float speed = SpeedCalaulator.GetComponent<SpeedCalculate>().speed;
+        float speed = SpeedCalculator.GetComponent<SpeedCalculate>().speed;
         switch (gearInput)
         {
             case 0:                                                                 //후진
@@ -322,11 +325,13 @@ public class Player : MonoBehaviour
         trans.position = UpdatePos;
         trans.rotation = UpdateRot;
     }
+    
     private void ApplyAntiRoll()
     {
         ApplyAntiRollForAxle(frontLeft, frontRight);
         ApplyAntiRollForAxle(rearLeft, rearRight);
     }
+    
     private void ApplyAntiRollForAxle(WheelCollider leftWheel, WheelCollider rightWheel)
     {
         WheelHit hit;
@@ -357,6 +362,7 @@ public class Player : MonoBehaviour
             rb.AddForceAtPosition(rightWheel.transform.up * antiRollForce, rightWheel.transform.position);
         }
     }
+    
     void LightControl()
     {
         t = Time.time;
@@ -457,14 +463,9 @@ public class Player : MonoBehaviour
         }
     }
 
-    IEnumerator ReStart()
-    {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-        yield return new WaitForSeconds(1f);
-    }
     void ShiftGear()
     {
-        float speed = SpeedCalaulator.GetComponent<SpeedCalculate>().speed;
+        float speed = SpeedCalculator.GetComponent<SpeedCalculate>().speed;
         switch (inputcondition)
         {
             case InputCondition.logitech_wheel:
@@ -495,7 +496,8 @@ public class Player : MonoBehaviour
                         GearSign.text = "D";
                         GearSign.color = Color.green;
                     }
-                }break;
+                }
+                break;
             case InputCondition.keyboard:
                 if (speed <= 1)
                 {
@@ -524,8 +526,14 @@ public class Player : MonoBehaviour
                         GearSign.color = Color.green;
                     }
                 }
-                    break;
+                break;
         }
+    }
+
+    IEnumerator ReStart()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        yield return new WaitForSeconds(1f);
     }
 
     IEnumerator CheckTrafficLight()
@@ -534,6 +542,7 @@ public class Player : MonoBehaviour
         if (checkingTrafficLight)
             StartCoroutine(ReStart());
     }
+
     IEnumerator CheckingLimitSpeed()
     {
         yield return new WaitForSeconds(8f);
@@ -563,7 +572,7 @@ public class Player : MonoBehaviour
         }
         if (col.CompareTag("LimitSpeedArea"))
         {
-            float speed = SpeedCalaulator.GetComponent<SpeedCalculate>().speed;
+            float speed = SpeedCalculator.GetComponent<SpeedCalculate>().speed;
             LimitSpeedImage.enabled = true;
             if (limitSpeed + 9 < speed)
             {
@@ -622,8 +631,4 @@ public class Player : MonoBehaviour
         public Light[] rightLight;
     }
 
-    /* 
-     시작 초기화
-     ToggleLights(effectinfo.backLight, false);
-     */
 }

@@ -11,6 +11,8 @@ TagManager:
   - wood
   - water
   - TrafficLightArea
+  - NavigateRight
+  - NavigateLeft
   layers:
   - Default
   - TransparentFX
