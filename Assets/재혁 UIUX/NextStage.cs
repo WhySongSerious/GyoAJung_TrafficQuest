@@ -11,7 +11,7 @@ public class NextStage : MonoBehaviour
 
     public void OnClickGameOneStart()
     {
-        SceneManager.LoadScene("Stage1");
+        LoadingSceneController.LoadScene("Stage1");
         Debug.Log("게임 변환 완료");
     }
 
