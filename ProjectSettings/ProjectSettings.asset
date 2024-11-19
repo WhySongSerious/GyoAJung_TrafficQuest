@@ -744,7 +744,7 @@ PlayerSettings:
   webGLMemoryGeometricGrowthCap: 96
   webGLPowerPreference: 2
   scriptingDefineSymbols:
-    Standalone: EASYROADS3D_PRO
+    Standalone: EASYROADS3D_PRO;SimpleTrafficSystem
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend: {}
