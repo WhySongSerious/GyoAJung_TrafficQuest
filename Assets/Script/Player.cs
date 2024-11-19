@@ -81,8 +81,8 @@ public class Player : MonoBehaviour
     [Header("Light")]
     //private bool isFrontIndicatorOn = false;                                                      //�������� �����ִ��� üũ
     private float blinkInterval = 0.52f;                                                              //�������õ��� ������ �� ������ ���� (��)
-    private bool isLeftIndicatorOn = false;                                                         //���� �������õ��� �����ִ��� üũ
-    private bool isRightIndicatorOn = false;                                                        //���� �������õ��� �����ִ��� üũ
+    public bool isLeftIndicatorOn = false;                                                         //���� �������õ��� �����ִ��� üũ
+    public bool isRightIndicatorOn = false;                                                        //���� �������õ��� �����ִ��� üũ
     private float lastBlinkTime;                                                                    //�������õ��� ������ �� ������ �������� ������ �������� �Ǵ��ϴ� ����
     private float lastIndicatorChangeTime = -1f;                                                    //�������õ��� �Ѱ� �� �� �Է°��� �ߺ��Ǵ� ��츦 �����ϱ� ���� ������ ���� ����
     private float changeDelay = 0.5f;                                                               //�������õ��� �Ѱ� �� �� �Է°��� �ߺ��Ǵ� ��츦 �����ϱ� ���� ������ ���� ����
@@ -281,13 +281,16 @@ public class Player : MonoBehaviour
             case 3:                                                                 //����
                 if (accelerator < 1)
                 {
-                    if (speed > 20)
+                    if (brakeForce < 1)
                     {
-                        currentAccelerator = -basicResistance;
-                    }
-                    else if (speed <= 20)
-                    {
-                        currentAccelerator = 40;
+                        if (speed > 20)
+                        {
+                            currentAccelerator = -basicResistance;
+                        }
+                        else if (speed <= 20)
+                        {
+                            currentAccelerator = 40;
+                        }
                     }
                 }
 
