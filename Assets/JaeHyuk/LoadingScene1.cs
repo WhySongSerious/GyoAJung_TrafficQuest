@@ -59,7 +59,7 @@ public class LoadingSceneController : MonoBehaviour
 
                 if (CurrentBar.fillAmount >= 1f)
                 {
-                    yield return new WaitForSeconds(2f); // 2초 대기
+                    yield return new WaitForSeconds(5f); // 2초 대기
                     op.allowSceneActivation = true;
                     yield break;
                 }
