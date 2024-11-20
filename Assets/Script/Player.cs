@@ -15,6 +15,7 @@ public enum InputCondition
 
 public class Player : MonoBehaviour
 {
+    public static Player instance;
     public EffectControlInfo effectinfo;                                                            //����Ʈ ����
 
     [Header("Wheel Colliders")]                                                                     //���� ����
@@ -44,6 +45,8 @@ public class Player : MonoBehaviour
     [Header("Speed")]
     [SerializeField] GameObject SpeedCalculator;
     [SerializeField] Image LimitSpeedImage;
+
+    [SerializeField] GameOver gameOver;
 
     //�ӵ����� ����
     public float accelerator;                                                                      //������ ���ϴ� ��
@@ -87,11 +90,19 @@ public class Player : MonoBehaviour
     private float lastIndicatorChangeTime = -1f;                                                    //�������õ��� �Ѱ� �� �� �Է°��� �ߺ��Ǵ� ��츦 �����ϱ� ���� ������ ���� ����
     private float changeDelay = 0.5f;                                                               //�������õ��� �Ѱ� �� �� �Է°��� �ߺ��Ǵ� ��츦 �����ϱ� ���� ������ ���� ����
 
+    public bool reStartButtonPressed = false; 
+
     private Rigidbody rb;
+    
 
     private void Awake()
     {
+        if(Player.instance == null)
+        {
+            Player.instance = this;
+        }
         rb = GetComponent<Rigidbody>();
+        gameOver = GetComponent<GameOver>();
     }
 
     void Start()
@@ -110,7 +121,26 @@ public class Player : MonoBehaviour
     {
         Debug.Log("SteeringShutdown:" + LogitechGSDK.LogiSteeringShutdown());                       
     }
-
+    private void Update()
+    {
+        switch (inputcondition)
+        {
+            case InputCondition.logitech_wheel:
+                if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
+                {
+                    rec = LogitechGSDK.LogiGetStateUnity(0);
+                    if (LogitechGSDK.LogiButtonIsPressed(0, 4) && t - lastIndicatorChangeTime >= changeDelay)
+                    {
+                        reStartButtonPressed = true;
+                    }
+                }
+                break;
+            case InputCondition.keyboard:
+                if(Input.GetKey(KeyCode.R))
+                    reStartButtonPressed = true;
+                break;
+        }
+    }
     void FixedUpdate()
     {
         switch (inputcondition)
@@ -164,7 +194,7 @@ public class Player : MonoBehaviour
                 }
                 break;
             case InputCondition.keyboard:
-                Debug.Log("keyboard");
+                //Debug.Log("keyboard");
                 if (Input.GetKey(KeyCode.UpArrow))
                 {
                     accelerator = 6;
@@ -191,7 +221,7 @@ public class Player : MonoBehaviour
                 }
                 break;
             case InputCondition.keyboard:
-                Debug.Log("keyboard");
+                //Debug.Log("keyboard");
                 if (Input.GetKey(KeyCode.UpArrow))
                 {
                     reverseForce = 6;
@@ -534,24 +564,19 @@ public class Player : MonoBehaviour
         }
     }
 
-    IEnumerator ReStart()
-    {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-        yield return new WaitForSeconds(1f);
-    }
-
     IEnumerator CheckTrafficLight()
     {
         yield return new WaitForSeconds(8f);
         if (checkingTrafficLight)
-            StartCoroutine(ReStart());
+            StartCoroutine(gameOver.TrafficLightGameOver());
+        Debug.Log("checkingTrafficLimit:  " + reStartButtonPressed);
     }
 
     IEnumerator CheckingLimitSpeed()
     {
         yield return new WaitForSeconds(8f);
         if (checkingLimit)
-            StartCoroutine(ReStart());
+            StartCoroutine(gameOver.LimitGameOver());
     }
 
     IEnumerator FinishGame()
@@ -569,9 +594,8 @@ public class Player : MonoBehaviour
             if (isRedLight)
             {
                 checkingTrafficLight = true;
-                //�������϶� ���� ��ġ�� �����ð� �ȿ� ������� ���ϸ� ���ӿ���
                 StartCoroutine(CheckTrafficLight());
-                Debug.Log("In TrafficLightArea" + "  current isRedLight: " + checkingTrafficLight + "  current Checking Traffic Light: " + checkingTrafficLight);
+                //Debug.Log("In TrafficLightArea" + "  current isRedLight: " + checkingTrafficLight + "  current Checking Traffic Light: " + checkingTrafficLight);
             }
         }
         if (col.CompareTag("LimitSpeedArea"))
@@ -620,8 +644,8 @@ public class Player : MonoBehaviour
     {
         if (collision.gameObject.CompareTag("Building"))
         {
-            Debug.Log("Bumped Building");
-            StartCoroutine(ReStart());
+            StartCoroutine (gameOver.CrashGameOver());
+            Debug.Log("Crash Building");
         }
     }
     //����Ʈ ���� ����

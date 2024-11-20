@@ -13,6 +13,7 @@ TagManager:
   - TrafficLightArea
   - NavigateRight
   - NavigateLeft
+  - NavigateFront
   layers:
   - Default
   - TransparentFX

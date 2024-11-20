@@ -6,12 +6,19 @@ public class NavigationImageController : MonoBehaviour
 {
     [SerializeField] Image R_image;
     [SerializeField] Image L_image;
+    [SerializeField] Image F_image;
     Image currentImage;
 
     void Start()
     {
+        ResetImage();
+    }
+
+    private void ResetImage()
+    {
         R_image.enabled = false;
         L_image.enabled = false;
+        F_image.enabled = false;
     }
     IEnumerator PopImage()
     {
@@ -39,8 +46,7 @@ public class NavigationImageController : MonoBehaviour
     {
         if (collider.CompareTag("NavigateRight"))
         {
-            R_image.enabled = false;
-            L_image.enabled = false;
+            ResetImage();
             currentImage = R_image;
             StopAllCoroutines();
             StartCoroutine(PopImage());
@@ -48,9 +54,16 @@ public class NavigationImageController : MonoBehaviour
 
         if (collider.CompareTag("NavigateLeft"))
         {
-            L_image.enabled = false;
-            R_image.enabled = false;
+            ResetImage();
             currentImage = L_image;
+            StopAllCoroutines();
+            StartCoroutine(PopImage());
+        }
+
+        if (collider.CompareTag("NavigateFront"))
+        {
+            ResetImage();
+            currentImage = F_image;
             StopAllCoroutines();
             StartCoroutine(PopImage());
         }
