@@ -14,6 +14,7 @@ TagManager:
   - NavigateRight
   - NavigateLeft
   - NavigateFront
+  - UArea
   layers:
   - Default
   - TransparentFX

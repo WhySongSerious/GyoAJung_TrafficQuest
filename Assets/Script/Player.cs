@@ -16,15 +16,15 @@ public enum InputCondition
 public class Player : MonoBehaviour
 {
     public static Player instance;
-    public EffectControlInfo effectinfo;                                                            //����Ʈ ����
+    public EffectControlInfo effectinfo;
 
-    [Header("Wheel Colliders")]                                                                     //���� ����
+    [Header("Wheel Colliders")]
     [SerializeField] WheelCollider frontRight;
     [SerializeField] WheelCollider frontLeft;
     [SerializeField] WheelCollider rearRight;
     [SerializeField] WheelCollider rearLeft;
 
-    [Header("Wheel Transforms")]                                                                    //���� ���־� ������Ʈ
+    [Header("Wheel Transforms")]
     [SerializeField] Transform frontRightTransform;
     [SerializeField] Transform frontLeftTransform;
     [SerializeField] Transform rearRightTransform;
@@ -49,22 +49,22 @@ public class Player : MonoBehaviour
     [SerializeField] GameOver gameOver;
 
     //�ӵ����� ����
-    public float accelerator;                                                                      //������ ���ϴ� ��
+    public float accelerator;                                                             
     private float reverseForce;
-    private float brakeForce;                                                                       //�극��ũ�� ���ϴ� ��
-    public float currentAccelerator = 0f;                                                          //���� ������ ��� ���� ��Ҵ���
+    private float brakeForce;                                                               
+    public float currentAccelerator = 0f;                                                    
     private float currentReverseForce = 0f;
-    private float currentBrakeForce = 0f;                                                           //���� �극��ũ�� ��� ���� ��Ҵ���
-    private float currentTurnAngle = 0f;                                                            //���� ���� ����
+    private float currentBrakeForce = 0f;   
+    private float currentTurnAngle = 0f;
     private float maxTurnAngle = 30f;
 
     private float basicResistance = 1f;
 
     [Header("Anti-Roll")]
-    private float antiRollForce = 5000f;                                                            //Anri-roll ����
+    private float antiRollForce = 5000f;                                                           
 
     [Header("Handle Resistance")]
-    private int handleResistance = 30;                                                              //�ڵ� ���� ����
+    private int handleResistance = 30;                                                             
 
     [Header("Gear")]
     private int gearInput = 1;
@@ -73,22 +73,23 @@ public class Player : MonoBehaviour
     private float limitSpeed = 50;
 
     [Header("Input Condition")]
-    public InputCondition inputcondition;                                                           //���� Input�� wheel/keyboard üũ
+    public InputCondition inputcondition;                                                   
 
-    private float t;                                                                                //�ð� ���� ����
+    private float t;                                                                       
 
-    private Vector3 initialVelocity = Vector3.zero;                                                 //keyboard ����� ���� �ӵ�
+    private Vector3 initialVelocity = Vector3.zero;                                                
 
-    static LogitechGSDK.DIJOYSTATE2ENGINES rec;                                                     //wheel�� ��� ������ ���� ����
+    static LogitechGSDK.DIJOYSTATE2ENGINES rec;                                                     
 
     [Header("Light")]
-    //private bool isFrontIndicatorOn = false;                                                      //�������� �����ִ��� üũ
-    private float blinkInterval = 0.52f;                                                              //�������õ��� ������ �� ������ ���� (��)
-    public bool isLeftIndicatorOn = false;                                                         //���� �������õ��� �����ִ��� üũ
-    public bool isRightIndicatorOn = false;                                                        //���� �������õ��� �����ִ��� üũ
-    private float lastBlinkTime;                                                                    //�������õ��� ������ �� ������ �������� ������ �������� �Ǵ��ϴ� ����
-    private float lastIndicatorChangeTime = -1f;                                                    //�������õ��� �Ѱ� �� �� �Է°��� �ߺ��Ǵ� ��츦 �����ϱ� ���� ������ ���� ����
-    private float changeDelay = 0.5f;                                                               //�������õ��� �Ѱ� �� �� �Է°��� �ߺ��Ǵ� ��츦 �����ϱ� ���� ������ ���� ����
+    //private bool isFrontIndicatorOn = false;                                                      
+    private float blinkInterval = 0.52f;                                                             
+    public bool isLeftIndicatorOn = false;                                                         
+    public bool isRightIndicatorOn = false;
+    private bool isEmergencyOn = false;
+    private float lastBlinkTime;                                                                  
+    private float lastIndicatorChangeTime = -1f;                                                
+    private float changeDelay = 0.5f;                                                              
 
     public bool reStartButtonPressed = false; 
 
@@ -97,23 +98,23 @@ public class Player : MonoBehaviour
 
     private void Awake()
     {
-        if(Player.instance == null)
-        {
-            Player.instance = this;
-        }
         rb = GetComponent<Rigidbody>();
         gameOver = GetComponent<GameOver>();
     }
 
     void Start()
     {
-        Debug.Log("SteeringInit:" + LogitechGSDK.LogiSteeringInitialize(false));                    //wheel ������ �Ǿ� �ִ��� üũ
+        Debug.Log("SteeringInit:" + LogitechGSDK.LogiSteeringInitialize(false));
         LimitSpeedImage.enabled = !enabled;
         leftSign.enabled = !enabled;
         rightSign.enabled = !enabled;
         checkingFinish = false;
         ToggleLights(effectinfo.backLight, false);
         LogitechGSDK.LogiPlayDamperForce(0, handleResistance);
+        if (Player.instance == null)
+        {
+            Player.instance = this;
+        }
     }
 
     //������ �� wheel ������ ���� �ִ��� üũ
@@ -146,15 +147,15 @@ public class Player : MonoBehaviour
         switch (inputcondition)
         {
             case InputCondition.logitech_wheel:
-                if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))                           //wheel ������Ʈ && ��Ʈ�ѷ� �� 0��°�� ����Ǿ� �ִ��� üũ
+                if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))                       
                 {
                     ShiftGear();
                     Reverse();
-                    Accel();                                                                                //���� ���� �Լ�
-                    Brake();                                                                                //�극��ũ ���� �Լ�
-                    WheelControl();                                                                         //�ڵ� ���� �Լ�
-                    LightControl();                                                                         //�������õ�� ���� ����Ʈ ���� �Լ�
-                    ApplyAntiRoll();                                                                         //Anti-roll ���� �Լ�
+                    Accel();                                                                         
+                    Brake();                                                                        
+                    WheelControl();                                                                   
+                    LightControl();                                                                   
+                    ApplyAntiRoll();                                                          
                 }
                 else if (!LogitechGSDK.LogiIsConnected(0))
                 {
@@ -183,11 +184,11 @@ public class Player : MonoBehaviour
         t = Time.deltaTime;
         switch (inputcondition)
         {
-            case InputCondition.logitech_wheel:                                                     //wheel ���� ��
+            case InputCondition.logitech_wheel:                                                   
                 if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
                 {
                     rec = LogitechGSDK.LogiGetStateUnity(0);
-                    accelerator = Mathf.Abs(rec.lY - 32767) / 5000;                                    //������ �󸶳� ��Ҵ��� ���� (������ -32768 ~ 32767)
+                    accelerator = Mathf.Abs(rec.lY - 32767) / 5000;                                  
                     currentAccelerator += accelerator * t;
                     //Debug.Log("Logitech Accel Force: " + currentAccelerator);
 
@@ -210,11 +211,11 @@ public class Player : MonoBehaviour
         t = Time.deltaTime;
         switch (inputcondition)
         {
-            case InputCondition.logitech_wheel:                                                     //wheel ���� ��
+            case InputCondition.logitech_wheel:                                               
                 if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
                 {
                     rec = LogitechGSDK.LogiGetStateUnity(0);
-                    reverseForce = Mathf.Abs(rec.lY - 32767) / 5000;                                    //������ �󸶳� ��Ҵ��� ���� (������ -32768 ~ 32767)
+                    reverseForce = Mathf.Abs(rec.lY - 32767) / 5000;                             
                     currentReverseForce += reverseForce * t;
                     Debug.Log("Logitech Accel Force: " + currentReverseForce);
 
@@ -241,7 +242,7 @@ public class Player : MonoBehaviour
                 if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
                 {
                     rec = LogitechGSDK.LogiGetStateUnity(0);
-                    brakeForce = Mathf.Abs(rec.lRz - 32767) * 100;                                    //�극��ũ�� �󸶳� ��Ҵ��� ���� (������ -32768 ~ 32767)
+                    brakeForce = Mathf.Abs(rec.lRz - 32767) * 100;                             
                     //Debug.Log("Logitech Brake Force: " + brakeForce / 100);
                     if(brakeForce > 1)
                     {
@@ -275,13 +276,13 @@ public class Player : MonoBehaviour
         }
     }
 
-    //�� ���� �Լ�
+
     void WheelControl()
     {
         float speed = SpeedCalculator.GetComponent<SpeedCalculate>().speed;
         switch (gearInput)
         {
-            case 0:                                                                 //����
+            case 0:                                                    
                 if (reverseForce < 1)
                 {
                     if (speed > 20)
@@ -298,17 +299,17 @@ public class Player : MonoBehaviour
                 Debug.Log("motorTorque Reverse Force: " + currentReverseForce);
                 break;
 
-            case 1:                                                                 //����
+            case 1:                                                          
                 frontRight.motorTorque = 0;
                 frontLeft.motorTorque = 0;
                 break;
 
-            case 2:                                                                 //�߸�
+            case 2:                                                      
                 frontRight.motorTorque = 0;
                 frontLeft.motorTorque = 0;
                 break;
 
-            case 3:                                                                 //����
+            case 3:                                                      
                 if (accelerator < 1)
                 {
                     if (brakeForce < 1)
@@ -324,37 +325,46 @@ public class Player : MonoBehaviour
                     }
                 }
 
-                frontRight.motorTorque = currentAccelerator;                                                    //�չ����� ������ ���� ��ŭ�� ���� �����Ͽ� ������ ������
+                frontRight.motorTorque = currentAccelerator;                                               
                 frontLeft.motorTorque = currentAccelerator;
                 Debug.Log("motorTorque Accel Force: " + accelerator);
                 break;
 
         }
 
-        frontRight.brakeTorque = currentBrakeForce;                                                    //��� ������ �극��ũ�� ���� ��ŭ�� ���� �����Ͽ� ������ ������
+        frontRight.brakeTorque = currentBrakeForce;                                         
         frontLeft.brakeTorque = currentBrakeForce;
         rearRight.brakeTorque = currentBrakeForce;
         rearLeft.brakeTorque = currentBrakeForce;
 
+        LogitechGSDK.LogiPlayDamperForce(0, handleResistance);
+        switch (inputcondition) {
+            case InputCondition.logitech_wheel:
+                currentTurnAngle = maxTurnAngle * rec.lX / 32767;
+                break;
+            case InputCondition.keyboard:
+                currentTurnAngle = 15 * Input.GetAxis("Horizontal");
+                break;
+        }
 
-        LogitechGSDK.LogiPlayDamperForce(0, handleResistance);                                         //�ڵ鿡 handleResistance��ŭ ���� �ο�
-        currentTurnAngle = maxTurnAngle * rec.lX / 32767;                                              //�չ����� �ڵ��� ���� ��ŭ�� ���� �����Ͽ� ������ �ִ� �������� ������
+
+
         frontLeft.steerAngle = currentTurnAngle;
         frontRight.steerAngle = currentTurnAngle;
 
-        UpdateWheelVisual(frontRightTransform, frontRight);                                             //��� ������ �������� ������ ���ư��� ���־� ������Ʈ
+        UpdateWheelVisual(frontRightTransform, frontRight);                                      
         UpdateWheelVisual(frontLeftTransform, frontLeft);
         UpdateWheelVisual(rearRightTransform, rearRight);
         UpdateWheelVisual(rearLeftTransform, rearLeft);
     }
 
-    //�� � �ð�ȭ
-    void UpdateWheelVisual(Transform trans, WheelCollider wheelCol)                                     //��� ������ �������� ������ ���ư��� ���־� ������Ʈ ���� �Լ�
+
+    void UpdateWheelVisual(Transform trans, WheelCollider wheelCol)                                  
     {
         Vector3 UpdatePos;
         Quaternion UpdateRot;
 
-        wheelCol.GetWorldPose(out UpdatePos, out UpdateRot);                                            //�� � ���� ����� ���� ��ǥ�� ��ȯ
+        wheelCol.GetWorldPose(out UpdatePos, out UpdateRot);                                           
 
         trans.position = UpdatePos;
         trans.rotation = UpdateRot;
@@ -400,68 +410,136 @@ public class Player : MonoBehaviour
     void LightControl()
     {
         t = Time.time;
-        if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
+        switch (inputcondition)
         {
-            rec = LogitechGSDK.LogiGetStateUnity(0);
-
-            // ������ �������õ�
-            if (LogitechGSDK.LogiButtonIsPressed(0, 4) && t - lastIndicatorChangeTime >= changeDelay)
-            {
-                isRightIndicatorOn = !isRightIndicatorOn;                                                   // ���� ����
-                rightSign.enabled = isRightIndicatorOn;
-                if (isRightIndicatorOn)
+            case InputCondition.logitech_wheel:
+                if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
                 {
-                    isLeftIndicatorOn = false;                                                              // ���� ���� ����
-                    leftSign.enabled = false;
-                    ToggleLights(effectinfo.leftLight, false);
-                }
-                ToggleLights(effectinfo.rightLight, isRightIndicatorOn);
-                lastIndicatorChangeTime = t;                                                                // ������ ���� �ð� ���
-            }
+                    rec = LogitechGSDK.LogiGetStateUnity(0);
 
-            // ���� �������õ�
-            if (LogitechGSDK.LogiButtonIsPressed(0, 5) && t - lastIndicatorChangeTime >= changeDelay)
-            {
-                isLeftIndicatorOn = !isLeftIndicatorOn;                                                     // ���� ����
-                leftSign.enabled = isLeftIndicatorOn;
-                if (isLeftIndicatorOn)
-                {
-                    isRightIndicatorOn = false;                                                             // ������ ���� ����
-                    rightSign.enabled = false;
-                    ToggleLights(effectinfo.rightLight, false);
+                    if (LogitechGSDK.LogiButtonIsPressed(0, 4) && t - lastIndicatorChangeTime >= changeDelay)
+                    {
+                        isRightIndicatorOn = !isRightIndicatorOn;
+                        rightSign.enabled = isRightIndicatorOn;
+                        if (isRightIndicatorOn)
+                        {
+                            isLeftIndicatorOn = false;
+                            leftSign.enabled = false;
+                            ToggleLights(effectinfo.leftLight, false);
+                        }
+                        ToggleLights(effectinfo.rightLight, isRightIndicatorOn);
+                        lastIndicatorChangeTime = t;
+                    }
+
+                    if (LogitechGSDK.LogiButtonIsPressed(0, 5) && t - lastIndicatorChangeTime >= changeDelay)
+                    {
+                        isLeftIndicatorOn = !isLeftIndicatorOn;
+                        leftSign.enabled = isLeftIndicatorOn;
+                        if (isLeftIndicatorOn)
+                        {
+                            isRightIndicatorOn = false;
+                            rightSign.enabled = false;
+                            ToggleLights(effectinfo.rightLight, false);
+                        }
+                        ToggleLights(effectinfo.leftLight, isLeftIndicatorOn);
+                        lastIndicatorChangeTime = t;
+                    }
+
+                    if (LogitechGSDK.LogiButtonIsPressed(0, 6) && t - lastIndicatorChangeTime >= changeDelay)
+                    {
+                        isEmergencyOn = true;
+                        isLeftIndicatorOn = !isEmergencyOn;
+                        isRightIndicatorOn = !isEmergencyOn;
+                        if (isLeftIndicatorOn || isRightIndicatorOn)
+                        {
+                            rightSign.enabled = false;
+                            leftSign.enabled = false;
+                            ToggleLights(effectinfo.rightLight, false);
+                            ToggleLights(effectinfo.rightLight, false);
+                        }
+                        ToggleLights(effectinfo.leftLight, isEmergencyOn);
+                        ToggleLights(effectinfo.rightLight, isEmergencyOn);
+
+                        lastIndicatorChangeTime = t;
+                    }
+                    /*
+
+                    if (LogitechGSDK.LogiButtonReleased(0, 6))
+                    {
+                        if (isFrontIndicatorOn)
+                        {
+                            ToggleLights(effectinfo.frontLight, false);
+                            isFrontIndicatorOn = false;
+                        }
+                        else
+                        {
+                            isFrontIndicatorOn = true;
+                            ToggleLights(effectinfo.frontLight, true); // ���� ����Ʈ �ѱ�
+                        }
+
+                    }
+                    */
+
+                    if (rec.lRz < 32766 || reverseForce > 1)
+                    {
+                        ToggleLights(effectinfo.backLight, true);
+                    }
+                    else
+                    {
+                        ToggleLights(effectinfo.backLight, false);
+                    }
                 }
-                ToggleLights(effectinfo.leftLight, isLeftIndicatorOn);
-                lastIndicatorChangeTime = t;                                                                // ������ ���� �ð� ���
-            }
-            /*
-            // ���� ����Ʈ
-            if (LogitechGSDK.LogiButtonReleased(0, 6))
-            {
-                if (isFrontIndicatorOn)
+                break;
+            case InputCondition.keyboard:
+                if (Input.GetKey(KeyCode.M) && t - lastIndicatorChangeTime >= changeDelay)
                 {
-                    ToggleLights(effectinfo.frontLight, false);
-                    isFrontIndicatorOn = false;
-                }
-                else
-                {
-                    isFrontIndicatorOn = true;
-                    ToggleLights(effectinfo.frontLight, true); // ���� ����Ʈ �ѱ�
+                    isRightIndicatorOn = !isRightIndicatorOn;
+                    rightSign.enabled = isRightIndicatorOn;
+                    if (isRightIndicatorOn)
+                    {
+                        isLeftIndicatorOn = false;
+                        leftSign.enabled = false;
+                        ToggleLights(effectinfo.leftLight, false);
+                    }
+                    ToggleLights(effectinfo.rightLight, isRightIndicatorOn);
+                    lastIndicatorChangeTime = t;
                 }
 
-            }
-            */
+                if (Input.GetKey(KeyCode.N) && t - lastIndicatorChangeTime >= changeDelay)
+                {
+                    isLeftIndicatorOn = !isLeftIndicatorOn;
+                    leftSign.enabled = isLeftIndicatorOn;
+                    if (isLeftIndicatorOn)
+                    {
+                        isRightIndicatorOn = false;
+                        rightSign.enabled = false;
+                        ToggleLights(effectinfo.rightLight, false);
+                    }
+                    ToggleLights(effectinfo.leftLight, isLeftIndicatorOn);
+                    lastIndicatorChangeTime = t;
+                }
 
-            // ���� ����Ʈ
-            if (rec.lRz < 32766) // ���� ��� ��ġ
-            {
-                ToggleLights(effectinfo.backLight, true);                                                   // ���� �� �ѱ�
-            }
-            else
-            {
-                ToggleLights(effectinfo.backLight, false);                                                  // ���� �� ����
-            }
+                if (Input.GetKey(KeyCode.B) && t - lastIndicatorChangeTime >= changeDelay)
+                {
+                    isEmergencyOn = !isEmergencyOn; // Toggle emergency state
+
+                    // Set both indicators to the state of the emergency
+                    isLeftIndicatorOn = isEmergencyOn;
+                    isRightIndicatorOn = isEmergencyOn;
+
+                    // Enable or disable the signs
+                    leftSign.enabled = isEmergencyOn;
+                    rightSign.enabled = isEmergencyOn;
+
+                    // Control the lights based on emergency state
+                    ToggleLights(effectinfo.rightLight, isEmergencyOn);
+                    ToggleLights(effectinfo.leftLight, isEmergencyOn);
+
+                    lastIndicatorChangeTime = t;
+                }
+                break;
         }
-
+        
         SignBlinking(leftSign, isLeftIndicatorOn, t);
         SignBlinking(rightSign, isRightIndicatorOn, t);
         HandleBlinking(effectinfo.leftLight, isLeftIndicatorOn, t);
@@ -472,7 +550,7 @@ public class Player : MonoBehaviour
     {
         foreach (Light light in lights)
         {
-            light.enabled = state ?? !light.enabled;                                                        // ���¿� ���� ����Ʈ �Ѱų� ����
+            light.enabled = state ?? !light.enabled;                                              
         }
     }
 
@@ -483,7 +561,7 @@ public class Player : MonoBehaviour
             lastBlinkTime = t;
             foreach (Light light in lights)
             {
-                light.enabled = !light.enabled;                                                             // ����Ʈ ���� ������
+                light.enabled = !light.enabled;         
             }
         }
     }
@@ -492,8 +570,8 @@ public class Player : MonoBehaviour
     {
         if (isIndicatorOn && t - lastBlinkTime >= blinkInterval)
         {
-            lastBlinkTime = t;
-            sign.enabled = !sign.enabled;                                                                   // �������õ� ���� ������
+            //lastBlinkTime = t;
+            sign.enabled = !sign.enabled;                
         }
     }
 
@@ -648,7 +726,7 @@ public class Player : MonoBehaviour
             Debug.Log("Crash Building");
         }
     }
-    //����Ʈ ���� ����
+
     [System.Serializable]
     public struct EffectControlInfo
     {
@@ -658,5 +736,4 @@ public class Player : MonoBehaviour
         public Light[] leftLight;
         public Light[] rightLight;
     }
-
 }
